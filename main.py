@@ -13,7 +13,7 @@ client = InferenceClient(token=token)
 class PromptRequest(BaseModel):
     prompt: str
 
-@app.post("/run")
+@app.post("/")  # ✅ Changed from /run to /
 async def generate_image(data: PromptRequest):
     unique_filename = f"generated_{uuid.uuid4().hex}.png"
     result = client.text_to_image(
@@ -25,7 +25,7 @@ async def generate_image(data: PromptRequest):
     result.save(unique_filename)
     return FileResponse(unique_filename, media_type="image/png", filename=unique_filename)
 
-# 👇 Add this block to make it work with exposed port 3000
+# 👇 This is for local testing, not needed on RunPod but can stay
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3000)
