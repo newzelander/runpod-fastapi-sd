@@ -13,7 +13,7 @@ client = InferenceClient(token=token)
 class PromptRequest(BaseModel):
     prompt: str
 
-@app.post("/")  # ✅ Changed from /run to /
+@app.post("/runsync") 
 async def generate_image(data: PromptRequest):
     unique_filename = f"generated_{uuid.uuid4().hex}.png"
     result = client.text_to_image(
