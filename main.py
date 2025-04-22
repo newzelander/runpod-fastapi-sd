@@ -21,24 +21,28 @@ async def root():
 
 @app.post("/runsync")
 async def generate_image(data: PromptRequest):
-    print(f"Generating image for prompt: {data.prompt}")
+    try:
+        print(f"Generating image for prompt: {data.prompt}")
 
-    # Generate the image
-    result = client.text_to_image(
-        model=model_id,
-        prompt=data.prompt,
-        num_inference_steps=50,
-        guidance_scale=7.5
-    )
-    
-    # Convert the image to base64
-    img_byte_arr = BytesIO()
-    result.save(img_byte_arr, format="PNG")
-    img_byte_arr.seek(0)
-    
-    img_base64 = base64.b64encode(img_byte_arr.read()).decode("utf-8")
-    
-    return JSONResponse(content={"image_base64": img_base64})
+        # Generate the image
+        result = client.text_to_image(
+            model=model_id,
+            prompt=data.prompt,
+            num_inference_steps=50,
+            guidance_scale=7.5
+        )
+        
+        # Convert the image to base64
+        img_byte_arr = BytesIO()
+        result.save(img_byte_arr, format="PNG")
+        img_byte_arr.seek(0)
+        
+        img_base64 = base64.b64encode(img_byte_arr.read()).decode("utf-8")
+        return JSONResponse(content={"image_base64": img_base64})
+
+    except Exception as e:
+        print(f"[ERROR] Failed to generate image: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 # Local testing (optional)
 if __name__ == "__main__":
