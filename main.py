@@ -5,7 +5,6 @@ import uuid
 import base64
 from io import BytesIO
 from fastapi.responses import JSONResponse
-import asyncio
 
 app = FastAPI()
 
@@ -30,19 +29,20 @@ async def root():
 async def generate_image(data: PromptRequest):
     try:
         print(f"Generating image for prompt: {data.prompt}")
-        img_base64 = await generate_image_from_prompt(data.prompt)  # Making it async to allow non-blocking IO
+        img_base64 = generate_image_from_prompt(data.prompt)
         return JSONResponse(content={"image_base64": img_base64})
     except Exception as e:
         print(f"Error occurred during image generation: {e}")
         return JSONResponse(status_code=500, content={"error": "Failed to generate image. Please try again."})
 
-# Optimized: Adding async to the image generation function
-async def generate_image_from_prompt(prompt: str) -> str:
-    result = await asyncio.to_thread(client.text_to_image,  # Async call to prevent blocking the server
-                                      model=model_id,
-                                      prompt=prompt,
-                                      num_inference_steps=50,
-                                      guidance_scale=7.5)
+# ✅ This is the function your RunPod handler will import
+def generate_image_from_prompt(prompt: str) -> str:
+    result = client.text_to_image(
+        model=model_id,
+        prompt=prompt,
+        num_inference_steps=50,
+        guidance_scale=7.5
+    )
     img_byte_arr = BytesIO()
     result.save(img_byte_arr, format="PNG")
     img_byte_arr.seek(0)
