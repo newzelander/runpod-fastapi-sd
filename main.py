@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from huggingface_hub import InferenceClient
-from fastapi.responses import FileResponse
 import uuid
+import base64
+from io import BytesIO
+from fastapi.responses import JSONResponse
 
 app = FastAPI()
-
-print("FastAPI app initialized")  # ✅ Helpful log for RunPod
 
 token = "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"
 model_id = "stabilityai/stable-diffusion-3.5-large"
@@ -15,26 +15,32 @@ client = InferenceClient(token=token)
 class PromptRequest(BaseModel):
     prompt: str
 
-# ✅ Health check endpoint for RunPod
 @app.get("/")
 async def root():
     return {"message": "Service is running"}
 
-# ✅ Main image generation route
 @app.post("/runsync")
 async def generate_image(data: PromptRequest):
-    print(f"Generating image for prompt: {data.prompt}")  # ✅ Debug log
-    unique_filename = f"generated_{uuid.uuid4().hex}.png"
+    print(f"Generating image for prompt: {data.prompt}")
+
+    # Generate the image
     result = client.text_to_image(
         model=model_id,
         prompt=data.prompt,
         num_inference_steps=50,
         guidance_scale=7.5
     )
-    result.save(unique_filename)
-    return FileResponse(unique_filename, media_type="image/png", filename=unique_filename)
+    
+    # Convert the image to base64
+    img_byte_arr = BytesIO()
+    result.save(img_byte_arr, format="PNG")
+    img_byte_arr.seek(0)
+    
+    img_base64 = base64.b64encode(img_byte_arr.read()).decode("utf-8")
+    
+    return JSONResponse(content={"image_base64": img_base64})
 
-# ✅ For local testing
+# Local testing (optional)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3000)
