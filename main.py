@@ -10,7 +10,14 @@ app = FastAPI()
 
 token = "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"
 model_id = "stabilityai/stable-diffusion-3.5-large"
-client = InferenceClient(token=token)
+
+# Add print statements for debugging
+print("Initializing InferenceClient...")
+try:
+    client = InferenceClient(token=token)
+    print("InferenceClient initialized successfully.")
+except Exception as e:
+    print(f"Error initializing InferenceClient: {e}")
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -41,10 +48,11 @@ async def generate_image(data: PromptRequest):
         return JSONResponse(content={"image_base64": img_base64})
 
     except Exception as e:
-        print(f"Error occurred: {e}")
+        print(f"Error occurred during image generation: {e}")
         return JSONResponse(status_code=500, content={"error": "Failed to generate image. Please try again."})
 
 # Local testing (optional)
 if __name__ == "__main__":
     import uvicorn
+    print("Starting FastAPI server...")
     uvicorn.run(app, host="0.0.0.0", port=3000)
