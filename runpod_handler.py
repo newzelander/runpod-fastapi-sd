@@ -1,11 +1,15 @@
 import runpod
-from main import app
+from main import generate_image_from_prompt
 
-# Ensure the handler is the actual function, not just a string
-config = {
-    "app": app,
-    "handler": app.get("/runsync"),  # Direct reference to the runsync route
-}
+# Define a simple handler for RunPod jobs
+def handler(job):
+    try:
+        prompt = job["input"]["prompt"]
+        image_base64 = generate_image_from_prompt(prompt)
+        return {"image_base64": image_base64}
+    except Exception as e:
+        print(f"Handler error: {e}")
+        return {"error": str(e)}
 
-# Start the serverless FastAPI app on RunPod
-runpod.serverless.start(config)
+# Start RunPod serverless
+runpod.serverless.start({"handler": handler})
