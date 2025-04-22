@@ -1,6 +1,7 @@
-fastapi
-uvicorn
-huggingface_hub
-torch
-diffusers
-transformers
+fastapi
+uvicorn
+huggingface_hub
+torch
+diffusers
+transformers
+pillow  # Added for image handling and saving
