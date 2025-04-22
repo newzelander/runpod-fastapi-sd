@@ -11,7 +11,6 @@ app = FastAPI()
 token = "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"
 model_id = "stabilityai/stable-diffusion-3.5-large"
 
-# Add print statements for debugging
 print("Initializing InferenceClient...")
 try:
     client = InferenceClient(token=token)
@@ -30,26 +29,24 @@ async def root():
 async def generate_image(data: PromptRequest):
     try:
         print(f"Generating image for prompt: {data.prompt}")
-
-        # Generate the image
-        result = client.text_to_image(
-            model=model_id,
-            prompt=data.prompt,
-            num_inference_steps=50,
-            guidance_scale=7.5
-        )
-
-        # Convert the image to base64
-        img_byte_arr = BytesIO()
-        result.save(img_byte_arr, format="PNG")
-        img_byte_arr.seek(0)
-
-        img_base64 = base64.b64encode(img_byte_arr.read()).decode("utf-8")
+        img_base64 = generate_image_from_prompt(data.prompt)
         return JSONResponse(content={"image_base64": img_base64})
-
     except Exception as e:
         print(f"Error occurred during image generation: {e}")
         return JSONResponse(status_code=500, content={"error": "Failed to generate image. Please try again."})
+
+# ✅ This is the function your RunPod handler will import
+def generate_image_from_prompt(prompt: str) -> str:
+    result = client.text_to_image(
+        model=model_id,
+        prompt=prompt,
+        num_inference_steps=50,
+        guidance_scale=7.5
+    )
+    img_byte_arr = BytesIO()
+    result.save(img_byte_arr, format="PNG")
+    img_byte_arr.seek(0)
+    return base64.b64encode(img_byte_arr.read()).decode("utf-8")
 
 # Local testing (optional)
 if __name__ == "__main__":
