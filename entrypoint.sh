@@ -10,6 +10,6 @@ fi
 echo "🔐 Cloning model using Hugging Face token..."
 git clone https://${HF_TOKEN}@huggingface.co/stabilityai/stable-diffusion-3.5-large /model
 
-# Run your main app or service
+# Run your app
 echo "✅ Model cloned successfully. Starting app..."
 exec python runpod_handler.py
