@@ -1,14 +1,10 @@
 # -------- Stage 1: Public Model Image (you build & push this once) --------
-FROM python:3.10-slim as model-stage
+FROM python:3.10-slim AS model-stage
 
 # Install Git, Git LFS, and clone Stable Diffusion model
 RUN apt-get update && \
     apt-get install -y git git-lfs && \
     git lfs install
-
-# Set up Hugging Face authentication using the secret token
-ARG HF_TOKEN
-RUN git clone https://${HF_TOKEN}@huggingface.co/stabilityai/stable-diffusion-3.5-large /model
 
 # -------- Stage 2: Private App Image --------
 FROM python:3.10-slim
