@@ -1,6 +1,7 @@
 import runpod
 from main import generate_image_from_prompt
 
+# Define a simple handler for RunPod jobs
 def handler(job):
     try:
         prompt = job["input"]["prompt"]
@@ -10,4 +11,5 @@ def handler(job):
         print(f"Handler error: {e}")
         return {"error": str(e)}
 
+# Start RunPod serverless
 runpod.serverless.start({"handler": handler})
