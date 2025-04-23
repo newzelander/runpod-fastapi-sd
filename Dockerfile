@@ -6,9 +6,13 @@ RUN apt-get update && \
     apt-get install -y git git-lfs && \
     git lfs install
 
-# Clone the Stable Diffusion model into /model
+# Set Hugging Face token as an environment variable
+ARG HUGGINGFACE_TOKEN=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
+ENV HUGGINGFACE_TOKEN=$HUGGINGFACE_TOKEN
+
+# Clone the Stable Diffusion model into /model using the token
 RUN git lfs install && \
-    git clone https://huggingface.co/stabilityai/stable-diffusion-3.5-large /model
+    git clone https://$HUGGINGFACE_TOKEN@huggingface.co/stabilityai/stable-diffusion-3.5-large /model
 
 # -------- Stage 2: Private App Image --------
 FROM python:3.10-slim
