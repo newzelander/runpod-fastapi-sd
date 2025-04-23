@@ -12,4 +12,4 @@ git clone https://${HF_TOKEN}@huggingface.co/stabilityai/stable-diffusion-3.5-la
 
 # Run your main app or service
 echo "✅ Model cloned successfully. Starting app..."
-exec bash
+exec python runpod_handler.py
