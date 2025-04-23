@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from pydantic import BaseModel
 from huggingface_hub import InferenceClient
@@ -8,7 +9,12 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
-token = "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"
+# Fetch the Hugging Face token from the environment variable (with RUNPOD_SECRET_ prefix)
+token = os.getenv("RUNPOD_SECRET_HF_TOKEN")  # This will retrieve the secret using the correct key
+
+if not token:
+    raise ValueError("Hugging Face token is missing. Please set it as an environment variable.")
+
 model_id = "stabilityai/stable-diffusion-3.5-large"
 
 print("Initializing InferenceClient...")
