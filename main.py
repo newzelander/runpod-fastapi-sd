@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 app = FastAPI()
 
 # Fetch the Hugging Face token from the environment variable (with RUNPOD_SECRET_ prefix)
-token = os.getenv("RUNPOD_SECRET_HF_TOKEN")  # This will retrieve the secret using the correct key
+token = os.getenv("HF_TOKEN")  # This will retrieve the secret using the correct key
 
 if not token:
     raise ValueError("Hugging Face token is missing. Please set it as an environment variable.")
