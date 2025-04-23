@@ -17,13 +17,5 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY . /app
 WORKDIR /app
 
-# Download model (important for preload method)
-RUN python3 -c "\
-from diffusers import StableDiffusionPipeline; \
-StableDiffusionPipeline.from_pretrained(\
-    'stabilityai/stable-diffusion-3.5', \
-    torch_dtype='float16', \
-    use_safetensors=True).to('cuda')"
-
 # Expose the FastAPI app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
