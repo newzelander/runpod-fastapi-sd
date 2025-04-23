@@ -1,8 +1,7 @@
 fastapi
 uvicorn
-huggingface_hub
 torch
 diffusers
 transformers
-pillow  # Added for image handling and saving
-runpod  # Add this line
+pillow
+runpod
