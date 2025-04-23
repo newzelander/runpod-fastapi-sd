@@ -6,8 +6,9 @@ RUN apt-get update && \
     apt-get install -y git git-lfs && \
     git lfs install
 
-# Clone the model from Hugging Face
-RUN git clone https://huggingface.co/stabilityai/stable-diffusion-3.5-large /model
+# Set up Hugging Face authentication using the secret token
+ARG HF_TOKEN
+RUN git clone https://${HF_TOKEN}@huggingface.co/stabilityai/stable-diffusion-3.5-large /model
 
 # -------- Stage 2: Private App Image --------
 FROM python:3.10-slim
@@ -18,11 +19,15 @@ WORKDIR /app
 COPY --from=model-stage /model /app/models/sd3.5
 
 # Install app dependencies
-COPY requirements.txt . 
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of your app code (FastAPI app, runpod handler, etc.)
 COPY . .
 
-# Command to start the app
-CMD ["python", "runpod_handler.py"]
+# Copy entrypoint script that will use the token at runtime
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Command to start the app (run the entrypoint script)
+CMD ["/app/entrypoint.sh"]
