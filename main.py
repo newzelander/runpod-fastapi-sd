@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from diffusers import StableDiffusionPipeline
-import torch
+from huggingface_hub import InferenceClient
 import uuid
 import base64
 from io import BytesIO
@@ -9,12 +8,15 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
-# Load local model
-print("Loading local Stable Diffusion model...")
-model_path = "/app/models/sd3.5"
-pipe = StableDiffusionPipeline.from_pretrained(model_path, torch_dtype=torch.float16)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
-print("Model loaded successfully.")
+token = "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"
+model_id = "stabilityai/stable-diffusion-3.5-large"
+
+print("Initializing InferenceClient...")
+try:
+    client = InferenceClient(token=token)
+    print("InferenceClient initialized successfully.")
+except Exception as e:
+    print(f"Error initializing InferenceClient: {e}")
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -33,8 +35,14 @@ async def generate_image(data: PromptRequest):
         print(f"Error occurred during image generation: {e}")
         return JSONResponse(status_code=500, content={"error": "Failed to generate image. Please try again."})
 
+# ✅ This is the function your RunPod handler will import
 def generate_image_from_prompt(prompt: str) -> str:
-    result = pipe(prompt, num_inference_steps=50, guidance_scale=7.5).images[0]
+    result = client.text_to_image(
+        model=model_id,
+        prompt=prompt,
+        num_inference_steps=50,
+        guidance_scale=7.5
+    )
     img_byte_arr = BytesIO()
     result.save(img_byte_arr, format="PNG")
     img_byte_arr.seek(0)
