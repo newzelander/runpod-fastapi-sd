@@ -1,4 +1,5 @@
 accelerate
+protobuf
 sentencepiece
 fastapi
 uvicorn
