@@ -21,15 +21,21 @@ if not token:
 
 pipe = None
 
+# Set environment variable to prevent memory fragmentation
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 @app.on_event("startup")
 async def load_model():
     global pipe
     model_id = "stabilityai/stable-diffusion-3.5-large"
 
+    # Clear CUDA memory before loading the model
+    torch.cuda.empty_cache()
+
     pipe = StableDiffusion3Pipeline.from_pretrained(
         model_id,
         cache_dir=MODEL_DIR,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float16,  # Use mixed precision (half-precision)
         use_safetensors=True,
         token=token
     ).to("cuda")
