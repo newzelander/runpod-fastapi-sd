@@ -1,6 +1,6 @@
 import os
 import torch
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from diffusers import StableDiffusion3Pipeline
 from fastapi.responses import JSONResponse
@@ -22,7 +22,7 @@ if not token:
 pipe = None
 
 # Set environment variable to prevent memory fragmentation
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"  # Use a smaller max split size to avoid fragmentation
 
 @app.on_event("startup")
 async def load_model():
@@ -32,16 +32,18 @@ async def load_model():
         model_id = "stabilityai/stable-diffusion-3.5-large"
 
         # Clear CUDA memory before loading the model
-        torch.cuda.empty_cache()
-
-        pipe = StableDiffusion3Pipeline.from_pretrained(
-            model_id,
-            cache_dir=MODEL_DIR,  # Ensure this path is pointing to persistent storage
-            torch_dtype=torch.float16,  # Use mixed precision (half-precision)
-            use_safetensors=True,
-            token=token
-        ).to("cuda")
-        print("Model loaded.")
+        try:
+            torch.cuda.empty_cache()
+            pipe = StableDiffusion3Pipeline.from_pretrained(
+                model_id,
+                cache_dir=MODEL_DIR,  # Ensure this path is pointing to persistent storage
+                torch_dtype=torch.float16,  # Use mixed precision (half-precision)
+                use_safetensors=True,
+                token=token
+            ).to("cuda")
+            print("Model loaded.")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
     else:
         print("Model already loaded, skipping load.")
 
@@ -49,13 +51,17 @@ class GenerationRequest(BaseModel):
     prompt: str
 
 @app.post("/generate")
-def generate_image(data: GenerationRequest):
-    prompt = data.prompt
-    image = pipe(prompt).images[0]
+async def generate_image(data: GenerationRequest):
+    try:
+        prompt = data.prompt
+        # Generate image using the preloaded model
+        image = pipe(prompt).images[0]
 
-    buffered = BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        # Convert image to base64
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-    return JSONResponse(content={"image_base64": img_str, "id": str(uuid.uuid4())})
-
+        return JSONResponse(content={"image_base64": img_str, "id": str(uuid.uuid4())})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")
