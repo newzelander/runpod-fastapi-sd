@@ -12,7 +12,7 @@ import uuid
 app = FastAPI()
 
 # Set model directory to use persistent volume
-MODEL_DIR = "/runpod-volume/stable-diffusion-3.5"
+MODEL_DIR = "/runpod-volume/stable-diffusion-3.5"  # You can adjust this as needed
 
 token = os.getenv("HF_TOKEN")
 
@@ -27,18 +27,23 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 @app.on_event("startup")
 async def load_model():
     global pipe
-    model_id = "stabilityai/stable-diffusion-3.5-large"
+    if pipe is None:  # Check if the model is already loaded
+        print("Loading model...")  # This will log if model loading is triggered
+        model_id = "stabilityai/stable-diffusion-3.5-large"
 
-    # Clear CUDA memory before loading the model
-    torch.cuda.empty_cache()
+        # Clear CUDA memory before loading the model
+        torch.cuda.empty_cache()
 
-    pipe = StableDiffusion3Pipeline.from_pretrained(
-        model_id,
-        cache_dir=MODEL_DIR,
-        torch_dtype=torch.float16,  # Use mixed precision (half-precision)
-        use_safetensors=True,
-        token=token
-    ).to("cuda")
+        pipe = StableDiffusion3Pipeline.from_pretrained(
+            model_id,
+            cache_dir=MODEL_DIR,  # Ensure this path is pointing to persistent storage
+            torch_dtype=torch.float16,  # Use mixed precision (half-precision)
+            use_safetensors=True,
+            token=token
+        ).to("cuda")
+        print("Model loaded.")
+    else:
+        print("Model already loaded, skipping load.")
 
 class GenerationRequest(BaseModel):
     prompt: str
@@ -53,3 +58,4 @@ def generate_image(data: GenerationRequest):
     img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
     return JSONResponse(content={"image_base64": img_str, "id": str(uuid.uuid4())})
+
