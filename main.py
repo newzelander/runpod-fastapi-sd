@@ -2,7 +2,7 @@ import os
 import torch
 from fastapi import FastAPI
 from pydantic import BaseModel
-from diffusers import StableDiffusionPipeline
+from diffusers import StableDiffusion3Pipeline
 from fastapi.responses import JSONResponse
 from io import BytesIO
 from PIL import Image
@@ -25,7 +25,7 @@ async def load_model():
     global pipe
     # Preload the model during FastAPI startup
     model_id = "stabilityai/stable-diffusion-3.5-large"
-    pipe = StableDiffusionPipeline.from_pretrained(
+    pipe = StableDiffusion3Pipeline.from_pretrained(
         model_id,
         torch_dtype=torch.float16,
         use_safetensors=True
