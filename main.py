@@ -1,3 +1,4 @@
+import os
 import torch
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -10,6 +11,12 @@ import uuid
 
 app = FastAPI()
 
+# Fetch the Hugging Face token from the environment variable (with RUNPOD_SECRET_ prefix)
+token = os.getenv("HF_TOKEN")  # This will retrieve the secret using the correct key
+
+if not token:
+    raise ValueError("Hugging Face token is missing. Please set it as an environment variable.")
+
 # Define global pipe variable to hold the preloaded model
 pipe = None
 
@@ -17,7 +24,7 @@ pipe = None
 async def load_model():
     global pipe
     # Preload the model during FastAPI startup
-    model_id = "stabilityai/stable-diffusion-3.5"
+    model_id = "stabilityai/stable-diffusion-3.5-large"
     pipe = StableDiffusionPipeline.from_pretrained(
         model_id,
         torch_dtype=torch.float16,
