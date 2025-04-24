@@ -10,12 +10,12 @@ RUN apt-get update && apt-get install -y \
     ln -s /usr/bin/python3 /usr/bin/python
 
 # Install Python packages
-COPY requirements.txt .
+COPY requirements.txt . 
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy code
+# Copy the app code
 COPY . /app
 WORKDIR /app
 
-# Expose the FastAPI app (running on port 8000)
+# Expose FastAPI app (running on port 8000)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
