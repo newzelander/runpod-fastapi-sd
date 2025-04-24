@@ -1,21 +1,16 @@
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+FROM python:3.10-slim
 
-# Set environment vars
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=1
-
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip git && \
-    ln -s /usr/bin/python3 /usr/bin/python
-
-# Install Python packages
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
-
-# Copy the app code
-COPY . /app
 WORKDIR /app
 
-# Expose FastAPI app (running on port 8000)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Copy requirements.txt and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the app code
+COPY . .
+
+# Add a simple debug statement to confirm the Docker container is running
+RUN echo "Starting the container..."
+
+# Start the app using Python
+CMD ["python", "runpod_handler.py"]
