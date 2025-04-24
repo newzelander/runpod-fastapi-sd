@@ -1,19 +1,15 @@
-from main import pipe
-import base64
-from io import BytesIO
+import runpod
+from main import generate_image_from_prompt
 
-def handler(event):
+# Define a simple handler for RunPod jobs
+def handler(job):
     try:
-        prompt = event["input"]["prompt"]
-        
-        # Generate image using the preloaded model
-        image = pipe(prompt).images[0]
-
-        # Convert image to base64
-        buffered = BytesIO()
-        image.save(buffered, format="PNG")
-        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-        return {"image_base64": img_str}
+        prompt = job["input"]["prompt"]
+        image_base64 = generate_image_from_prompt(prompt)
+        return {"image_base64": image_base64}
     except Exception as e:
-        return {"error": f"Image generation failed: {str(e)}"}
+        print(f"Handler error: {e}")
+        return {"error": str(e)}
+
+# Start RunPod serverless
+runpod.serverless.start({"handler": handler})
