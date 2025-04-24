@@ -1,11 +1,8 @@
-accelerate
-protobuf
-sentencepiece
 fastapi
 uvicorn
 huggingface_hub
 torch
 diffusers
 transformers
-pillow
-runpod
+pillow  # Added for image handling and saving
+runpod  # Add this line
