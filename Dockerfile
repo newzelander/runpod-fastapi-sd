@@ -9,4 +9,5 @@ COPY . .
 
 RUN echo "Starting the container..."
 
-CMD ["python", "runpod_handler.py"]
+# Run both FastAPI + RunPod handler at the same time
+CMD ["bash", "-c", "uvicorn main:app --host 0.0.0.0 --port 8000 & python runpod_handler.py"]
