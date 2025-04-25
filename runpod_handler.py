@@ -1,17 +1,13 @@
 import os
-import runpod
-import torch
-from diffusers import StableDiffusion3Pipeline
-from io import BytesIO
 import base64
+from io import BytesIO
+from diffusers import StableDiffusion3Pipeline
+from PIL import Image
+import runpod
+import time
 
+# Load model once
 MODEL_DIR = "/workspace/models/stable-diffusion-3.5"
-
-# Check if the model exists in the persistent volume cache
-if not os.path.exists(MODEL_DIR):
-    raise FileNotFoundError(f"Model not found in the RunPod persistent volume cache at {MODEL_DIR}. Please preload the model.")
-
-# Load the model
 pipe = StableDiffusion3Pipeline.from_pretrained(
     MODEL_DIR,
     torch_dtype=torch.float16
@@ -24,12 +20,37 @@ def handler(job):
         return {"error": "No prompt provided."}
 
     try:
+        # Generate the image
         image = pipe(prompt, num_inference_steps=50, guidance_scale=7.5).images[0]
+        
+        # Convert image to base64 (data URL format)
         img_bytes = BytesIO()
         image.save(img_bytes, format="PNG")
         img_bytes.seek(0)
         base64_img = base64.b64encode(img_bytes.read()).decode("utf-8")
-        return {"image_base64": base64_img}
+        
+        # Save image to RunPod persistent volume
+        timestamp = int(time.time())  # Using timestamp to ensure a unique filename
+        image_path = f"/workspace/images/generated_image_{timestamp}.png"
+        
+        with open(image_path, "wb") as f:
+            f.write(base64.b64decode(base64_img))
+
+        # Make the image available for 24 hours (expire time can be adjusted)
+        expire_time = timestamp + 86400  # 24 hours later
+
+        # Create the data URL for image
+        data_url = f"data:image/png;base64,{base64_img}"
+
+        # URL to access the image directly in the output (for downloading)
+        download_link = f"https://runpod.io/storage/{image_path}"
+
+        return {
+            "image_data_url": data_url,
+            "download_link": download_link,
+            "image_expiry_time": expire_time
+        }
+
     except Exception as e:
         return {"error": str(e)}
 
