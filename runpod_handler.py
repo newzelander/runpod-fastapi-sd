@@ -1,6 +1,7 @@
 import os
 import runpod
 import logging
+from preload_model import download_model  # Import the download_model function
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,11 +27,17 @@ def handler(event):
     # Log the result of the check
     logger.info(f"Model exists: {exists}")
     
-    # Respond based on whether the model is cached
-    if exists:
-        return {"status": "✅ Cached"}
-    else:
-        return {"status": "❌ Not found"}
+    # If the model doesn't exist, attempt to download it
+    if not exists:
+        logger.info("🔄 Model not found. Downloading model...")
+        try:
+            download_model()  # Call the function to download the model
+            logger.info("✅ Model successfully downloaded.")
+        except Exception as e:
+            logger.error(f"❌ Model download failed: {str(e)}")
+            return {"status": f"❌ Model download failed: {str(e)}"}
+    
+    return {"status": "✅ Cached" if exists else "❌ Not found"}
 
 # Start the RunPod serverless worker
 runpod.serverless.start({"handler": handler})
