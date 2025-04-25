@@ -1,5 +1,4 @@
 import runpod
-from main import generate_image_endpoint
 from diffusers import StableDiffusion3Pipeline
 
 # Preload model function to be called only once when the worker starts
@@ -11,20 +10,14 @@ def preload_model():
             cache_dir="/workspace/models/stable-diffusion-3.5"
         )
         print("Model pre-loaded successfully!")
+        return {"status": "Model preloaded successfully"}
     except Exception as e:
         print(f"Error preloading model: {str(e)}")
+        return {"error": str(e)}
 
 # RunPod job handler
 def handler(job):
-    try:
-        # Ensure the model is pre-loaded before generating the image
-        preload_model()
-        
-        # Get the prompt from the incoming job and generate the image
-        prompt = job["input"]["prompt"]
-        return generate_image_endpoint(prompt)
-    except Exception as e:
-        return {"error": str(e)}
+    return preload_model()  # Only preload the model, nothing else
 
 # Start the RunPod serverless worker with the defined handler
 runpod.serverless.start({"handler": handler})
