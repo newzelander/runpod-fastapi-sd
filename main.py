@@ -16,7 +16,7 @@ class PromptRequest(BaseModel):
 
 print("⏳ Loading model from persistent volume...")
 pipe = StableDiffusion3Pipeline.from_pretrained(
-    MODEL_DIR,
+    "/workspace/models/stable-diffusion-3.5",
     torch_dtype=torch.float16,
 ).to("cuda")
 pipe.enable_attention_slicing()
