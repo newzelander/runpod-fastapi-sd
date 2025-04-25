@@ -1,7 +1,7 @@
 import os
 import logging
 import time
-from diffusers import StableDiffusionPipeline
+from diffusers import StableDiffusion3Pipeline
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,7 +18,7 @@ def download_model():
         time.sleep(5)
         
         # Pre-download and cache the model (this will only happen once)
-        model = StableDiffusionPipeline.from_pretrained(
+        model = StableDiffusion3Pipeline.from_pretrained(
             "stabilityai/stable-diffusion-3.5-large",
             cache_dir=model_path
         )
