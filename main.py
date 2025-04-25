@@ -6,17 +6,19 @@ import torch
 from diffusers import StableDiffusion3Pipeline
 import base64
 from io import BytesIO
+import time
 
 app = FastAPI()
 
-MODEL_DIR = "/workspace/models/stable-diffusion-3.5"
+# Updated model path to match RunPod serverless volume location
+MODEL_DIR = "/runpod-volume/models/stable-diffusion-3.5-large"
 
 class PromptRequest(BaseModel):
     prompt: str
 
 print("⏳ Loading model from persistent volume...")
 pipe = StableDiffusion3Pipeline.from_pretrained(
-    "/workspace/models/stable-diffusion-3.5",
+    MODEL_DIR,
     torch_dtype=torch.float16,
 ).to("cuda")
 pipe.enable_attention_slicing()
@@ -37,9 +39,9 @@ async def generate_image_endpoint(data: PromptRequest):
         img_bytes.seek(0)
         base64_img = base64.b64encode(img_bytes.read()).decode("utf-8")
         
-        # Save image to RunPod persistent volume
+        # Save image to RunPod persistent volume (Updated path)
         timestamp = int(time.time())  # Using timestamp to ensure a unique filename
-        image_path = f"/workspace/images/generated_image_{timestamp}.png"
+        image_path = f"/runpod-volume/images/generated_image_{timestamp}.png"  # Updated path
         
         with open(image_path, "wb") as f:
             f.write(base64.b64decode(base64_img))
