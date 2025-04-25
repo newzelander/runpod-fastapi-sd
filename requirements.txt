@@ -6,3 +6,4 @@ diffusers
 transformers
 pillow  # Added for image handling and saving
 runpod  # Add this line
+protobuf
