@@ -1,30 +1,33 @@
-from diffusers import StableDiffusion3Pipeline
 import os
+import logging
 import time
+from diffusers import StableDiffusionPipeline
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger()
 
 # Define the correct path for RunPod Serverless persistent volume
-model_path = "/runpod-volume/models/stable-diffusion-3.5"
+model_path = "/runpod-volume/models/stable-diffusion-3.5-large"
 
 def download_model():
-    # Log the start of the model download process
-    print("⬇️ Downloading Stable Diffusion 3.5 model...")
-    
-    # Make sure the directory exists before downloading
-    os.makedirs(model_path, exist_ok=True)
-
     try:
-        # Download and cache the model
-        StableDiffusion3Pipeline.from_pretrained(
-            "stabilityai/stable-diffusion-3.5",
+        logger.info("⬇️ Downloading Stable Diffusion 3.5 Large model...")
+        
+        # Simulate delay for debugging
+        time.sleep(5)
+        
+        # Pre-download and cache the model (this will only happen once)
+        model = StableDiffusionPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-3.5-large",
             cache_dir=model_path
         )
-        print(f"✅ Model downloaded and cached at {model_path}")
-
-        # Add sleep to simulate a realistic download time
-        time.sleep(5)  # Simulating a 5-second download for debugging
-
+        
+        logger.info(f"✅ Model downloaded and cached at {model_path}")
+        
     except Exception as e:
-        print(f"❌ Error during model download: {e}")
+        logger.error(f"❌ Error occurred: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     download_model()
