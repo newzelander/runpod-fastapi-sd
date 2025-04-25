@@ -9,13 +9,15 @@ from io import BytesIO
 
 app = FastAPI()
 
-# Setup persistent model path
 MODEL_DIR = "/workspace/models/stable-diffusion-3.5"
 
 class PromptRequest(BaseModel):
     prompt: str
 
-# Load model once on app start
+# Check if the model exists in the persistent volume cache
+if not os.path.exists(MODEL_DIR):
+    raise FileNotFoundError(f"Model not found in the RunPod persistent volume cache at {MODEL_DIR}. Please preload the model.")
+
 print("⏳ Loading model from persistent volume...")
 pipe = StableDiffusion3Pipeline.from_pretrained(
     MODEL_DIR,
