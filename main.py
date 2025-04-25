@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 import torch
-from diffusers import StableDiffusionPipeline
+from diffusers import StableDiffusion3Pipeline
 import base64
 from io import BytesIO
 
@@ -17,7 +17,7 @@ class PromptRequest(BaseModel):
 
 # Load model once on app start
 print("⏳ Loading model from persistent volume...")
-pipe = StableDiffusionPipeline.from_pretrained(
+pipe = StableDiffusion3Pipeline.from_pretrained(
     MODEL_DIR,
     torch_dtype=torch.float16,
 ).to("cuda")
