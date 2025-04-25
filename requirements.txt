@@ -9,3 +9,4 @@ runpod  # Add this line
 protobuf
 safetensors
 accelerate
+sentencepiece
