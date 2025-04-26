@@ -1,24 +1,26 @@
-import subprocess
+import os
 import runpod
+from diffusers import StableDiffusion3Pipeline
+
+MODEL_PATH = "/runpod-volume/models/stable-diffusion-3.5-large"
 
 def my_handler(event):
     try:
-        # Get actual size of /runpod-volume
-        output = subprocess.check_output(
-            ['du', '-sh', '/runpod-volume']
-        ).decode('utf-8')
+        if not os.path.exists(MODEL_PATH):
+            return {"status": "error", "message": "Model path not found."}
 
-        # output is like "12G   /runpod-volume"
-        size = output.split()[0]
+        # Try to load the Stable Diffusion 3 Pipeline
+        pipe = StableDiffusion3Pipeline.from_pretrained(
+            MODEL_PATH,
+            local_files_only=True,
+            trust_remote_code=True,
+            safety_checker=None,
+            torch_dtype="auto"
+        )
 
-        return {
-            "status": "success",
-            "message": f"Used space: {size}B"
-        }
+        return {"status": "success", "message": "Model loaded successfully, no missing or corrupt files."}
+
     except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+        return {"status": "error", "message": f"Failed to load model: {str(e)}"}
 
 runpod.serverless.start({"handler": my_handler})
