@@ -2,7 +2,9 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# Install only runpod
+RUN pip install runpod
+
 COPY runpod_handler.py .
 
-# This Dockerfile is now ready to be called by RunPod Serverless.
-# DO NOT include CMD unless it's handler-based service execution.
+CMD ["python", "runpod_handler.py"]
