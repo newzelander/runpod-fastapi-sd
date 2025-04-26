@@ -1,5 +1,7 @@
 import subprocess
 
+print("✅ runpod_handler.py started, waiting for event...")
+
 def handler(event):
     try:
         # Run disk usage command on persistent volume
