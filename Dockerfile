@@ -1,13 +1,17 @@
-FROM python:3.10-slim
+# Use the official Python base image
+FROM python:3.9-slim
 
-# Install basic dependencies
-RUN apt-get update && apt-get install -y git
+# Set the working directory inside the container
+WORKDIR /app
 
-# Install Python libraries
-RUN pip install --no-cache-dir runpod diffusers transformers accelerate torch torchvision safetensors
+# Copy your requirements.txt file into the container
+COPY requirements.txt .
 
-# Copy your handler
-COPY runpod_handler.py /runpod_handler.py
+# Install the dependencies from requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Set the command for runpod
-CMD ["python3", "/runpod_handler.py"]
+# Copy your application code into the container
+COPY . .
+
+# Set the entrypoint for the container (assuming runpod_handler.py is your entry point)
+CMD ["python", "runpod_handler.py"]
