@@ -3,11 +3,19 @@ import runpod
 
 def my_handler(event):
     try:
-        # Run disk usage command on persistent volume
-        output = subprocess.check_output(['du', '-h', '/runpod-volume']).decode('utf-8')
+        # Run df and filter only /runpod-volume info
+        output = subprocess.check_output(
+            ['df', '-h', '--output=size,used,avail,pcent,target', '/runpod-volume']
+        ).decode('utf-8')
+
+        # Remove extra first line if needed
+        lines = output.strip().split('\n')
+        header = lines[0]
+        data = lines[1]
+
         return {
             "status": "success",
-            "message": output
+            "message": f"{header}\n{data}"
         }
     except Exception as e:
         return {
@@ -15,5 +23,4 @@ def my_handler(event):
             "message": str(e)
         }
 
-# Register handler with runpod
 runpod.serverless.start({"handler": my_handler})
