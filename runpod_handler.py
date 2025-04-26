@@ -1,8 +1,7 @@
 import subprocess
+import runpod
 
-print("✅ runpod_handler.py started, waiting for event...")
-
-def handler(event):
+def my_handler(event):
     try:
         # Run disk usage command on persistent volume
         output = subprocess.check_output(['df', '-h', '/runpod-volume']).decode('utf-8')
@@ -15,3 +14,6 @@ def handler(event):
             "status": "error",
             "message": str(e)
         }
+
+# Register handler with runpod
+runpod.serverless.start({"handler": my_handler})
