@@ -1,10 +1,13 @@
 FROM python:3.10-slim
 
-WORKDIR /app
+# Install basic dependencies
+RUN apt-get update && apt-get install -y git
 
-# Install only runpod
-RUN pip install runpod
+# Install Python libraries
+RUN pip install --no-cache-dir runpod diffusers transformers accelerate torch torchvision safetensors
 
-COPY runpod_handler.py .
+# Copy your handler
+COPY runpod_handler.py /runpod_handler.py
 
-CMD ["python", "runpod_handler.py"]
+# Set the command for runpod
+CMD ["python3", "/runpod_handler.py"]
