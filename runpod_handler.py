@@ -3,19 +3,17 @@ import runpod
 
 def my_handler(event):
     try:
-        # Run df and filter only /runpod-volume info
+        # Get actual size of /runpod-volume
         output = subprocess.check_output(
-            ['df', '-h', '--output=size,used,avail,pcent,target', '/runpod-volume']
+            ['du', '-sh', '/runpod-volume']
         ).decode('utf-8')
 
-        # Remove extra first line if needed
-        lines = output.strip().split('\n')
-        header = lines[0]
-        data = lines[1]
+        # output is like "12G   /runpod-volume"
+        size = output.split()[0]
 
         return {
             "status": "success",
-            "message": f"{header}\n{data}"
+            "message": f"Used space: {size}B"
         }
     except Exception as e:
         return {
