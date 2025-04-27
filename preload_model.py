@@ -34,9 +34,9 @@ def download_and_flatten_model():
             src = os.path.join(snapshot_folder, item)
             dst = os.path.join(final_model_path, item)
             if os.path.isdir(src):
-                shutil.copytree(src, dst, dirs_exist_ok=True)
+                shutil.move(src, dst)  # Move the directory
             else:
-                shutil.copy2(src, dst)
+                shutil.move(src, dst)  # Move the file
 
         logger.info("✅ Model downloaded and flattened successfully!")
 
