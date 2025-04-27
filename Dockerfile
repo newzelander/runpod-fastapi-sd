@@ -1,17 +1,16 @@
-# Use the official Python base image
-FROM python:3.9-slim
+# Dockerfile
 
-# Set the working directory inside the container
+FROM python:3.10-slim
+
+# Set working directory
 WORKDIR /app
 
-# Copy your requirements.txt file into the container
+# Copy and install dependencies
 COPY requirements.txt .
-
-# Install the dependencies from requirements.txt
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy your application code into the container
+# Copy all code
 COPY . .
 
-# Set the entrypoint for the container (assuming runpod_handler.py is your entry point)
+# Run the handler (main.py is auto-imported by runpod_handler.py)
 CMD ["python", "runpod_handler.py"]
