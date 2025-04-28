@@ -7,8 +7,9 @@ from diffusers import StableDiffusionPipeline  # Adjust based on your exact mode
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
-# Define the correct path for RunPod Serverless persistent volume
-model_path = "/runpod-volume/models/stable-diffusion-3.5-large"
+# Define the path for RunPod Serverless persistent volume
+runpod_volume_path = "/runpod-volume"
+model_path = os.path.join(runpod_volume_path, "models", "stable-diffusion-3.5-large")
 snapshot_base_path = os.path.join(model_path, "models--stabilityai--stable-diffusion-3.5-large", "snapshots")
 final_model_path = model_path  # Use the root folder for the model files
 
@@ -67,8 +68,8 @@ def download_and_flatten_model():
         raise
 
 if __name__ == "__main__":
-    # First, delete all files from the volume
-    delete_all_files_from_volume(model_path)
+    # First, delete all files from the entire /runpod-volume/ directory
+    delete_all_files_from_volume(runpod_volume_path)
     
     # Then download and flatten the model
     model_path = download_and_flatten_model()
