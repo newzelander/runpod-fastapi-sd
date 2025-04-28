@@ -1,16 +1,15 @@
-# Dockerfile
-
+# Use a Python base image
 FROM python:3.10-slim
 
-# Set working directory
+# Set up working directory
 WORKDIR /app
 
-# Copy and install dependencies
-COPY requirements.txt . 
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Copy the Python script and requirements.txt into the container
+COPY preload_model.py /app/preload_model.py
+COPY requirements.txt /app/requirements.txt
 
-# Copy all code
-COPY . .
+# Install the required dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Run the preload_model.py script to download and flatten the model
+# Command to run the preload_model.py script
 CMD ["python", "preload_model.py"]
