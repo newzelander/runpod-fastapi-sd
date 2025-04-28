@@ -11,23 +11,17 @@ def delete_volume_contents(volume_path):
     """Deletes everything from the volume"""
     logging.info("⬇️ Clearing the persistent volume...")
     try:
-        # Walk the directory tree and delete files and directories
-        for root_dir, dirs, files in os.walk(volume_path, topdown=False):
-            for file in files:
-                try:
-                    os.remove(os.path.join(root_dir, file))
-                except Exception as e:
-                    logging.warning(f"❌ Failed to delete file {file}: {e}")
-
-            for dir in dirs:
-                try:
-                    shutil.rmtree(os.path.join(root_dir, dir))  # Delete non-empty directories
-                except Exception as e:
-                    logging.warning(f"❌ Failed to delete directory {dir}: {e}")
-
+        # Walk through the directory and delete all files and directories
+        for item in os.listdir(volume_path):
+            item_path = os.path.join(volume_path, item)
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)  # Remove directory and contents
+            else:
+                os.remove(item_path)  # Remove file
         logging.info("✅ Volume cleared successfully!")
     except Exception as e:
-        logging.error(f"❌ Error clearing volume: {e}")
+        logging.error(f"❌ Error clearing volume: {str(e)}")
 
 # Main process
-delete_volume_contents(volume_path)
+if __name__ == "__main__":
+    delete_volume_contents(volume_path)
