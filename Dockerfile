@@ -16,3 +16,6 @@ COPY delete_all.py /app/delete_all.py
 
 # Set the entrypoint to run delete_all.py
 ENTRYPOINT ["python", "/app/delete_all.py"]
+
+# Prevent the container from restarting unless explicitly stopped
+STOPSIGNAL SIGTERM
