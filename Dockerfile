@@ -12,10 +12,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the Python script into the container
-COPY delete_all.py /app/delete_all.py
+COPY delete_model.py /app/delete_model.py
 
-# Set the entrypoint to run delete_all.py
-ENTRYPOINT ["python", "/app/delete_all.py"]
+# Set the entrypoint to run delete_model.py (which runs once and exits)
+ENTRYPOINT ["python", "/app/delete_model.py"]
 
-# Prevent the container from restarting unless explicitly stopped
-STOPSIGNAL SIGTERM
+# Ensure the container stops after the script finishes
+CMD ["exit"]
