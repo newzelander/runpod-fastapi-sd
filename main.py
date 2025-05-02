@@ -1,4 +1,4 @@
-from runpod.serverless.modules.rp_handler import runpod_handler
-from delete_volume import handler
+from runpod.serverless import start
+from delete_volume import handler  # Import your function
 
-runpod_handler(handler)
+start({"handler": handler})  # Register the handler function
