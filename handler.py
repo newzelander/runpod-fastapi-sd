@@ -2,7 +2,7 @@ import os
 from preload_model import download_model
 from symlink_tree import symlink_tree
 
-# Correct model path and inference path
+# Set the correct model path and inference path
 model_path = "/runpod-volume/models/stable-diffusion-3.5-large"  # Correct path
 inference_path = "/runpod-volume/inference_model"  # Correct path
 
