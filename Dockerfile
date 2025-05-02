@@ -1,8 +1,10 @@
 FROM python:3.10-slim
 
-# No environment variables needed unless you want unbuffered output
 WORKDIR /app
 
-COPY delete_volume.py /app/delete_volume.py
+# Install only runpod
+RUN pip install runpod
 
-ENTRYPOINT ["python", "delete_volume.py"]
+COPY runpod_handler.py .
+
+CMD ["python", "runpod_handler.py"]
