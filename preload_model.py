@@ -8,6 +8,12 @@ logger = logging.getLogger()
 
 def clear_volume(model_path):
     logger.info("⬇️ Clearing the persistent volume...")
+    
+    # Ensure the directory exists; if not, create it
+    if not os.path.exists(model_path):
+        logger.info(f"⚠️ Directory does not exist: {model_path}. Creating the directory.")
+        os.makedirs(model_path)
+    
     try:
         for item in os.listdir(model_path):
             item_path = os.path.join(model_path, item)
