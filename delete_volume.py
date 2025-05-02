@@ -3,7 +3,6 @@ import shutil
 import logging
 
 logging.basicConfig(level=logging.INFO)
-
 VOLUME_PATH = "/runpod-volume"
 
 def clear_volume():
@@ -21,5 +20,4 @@ def clear_volume():
 
 def handler(job):
     clear_volume()
-    return {"status": "done"}
-
+    return {"status": "volume cleared"}
