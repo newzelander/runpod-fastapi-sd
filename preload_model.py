@@ -2,6 +2,7 @@ import os
 from huggingface_hub import snapshot_download
 
 def download_model(model_path):
+    # If the model does not exist in the target path, download it
     if not os.path.exists(model_path):
         snapshot_download(
             repo_id="stabilityai/stable-diffusion-3.5",
