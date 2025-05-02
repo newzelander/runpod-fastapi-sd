@@ -16,5 +16,5 @@ EXPOSE 8000
 # Define environment variable
 ENV PYTHONUNBUFFERED 1
 
-# Run the application when the container starts
-ENTRYPOINT ["python", "/app/main.py"]
+# Set the correct entry point to start the server
+ENTRYPOINT ["python", "/app/handler.py"]
