@@ -1,7 +1,7 @@
 from huggingface_hub import snapshot_download
 import os
 
-MODEL_ID = "stabilityai/stable-diffusion-3.5"
+MODEL_ID = "stabilityai/stable-diffusion-3.5-large"
 CACHE_DIR = "/runpod-volume/models/hf-cache"
 
 def get_or_download_model():
