@@ -26,6 +26,11 @@ def show_disk_usage():
     print(f"[DISK] Used: {used // (2**20)} MB")
     print(f"[DISK] Free: {free // (2**20)} MB")
 
+def check_files_in_cache(directory):
+    # List all files in the cache directory
+    total_files = sum([len(files) for r, d, files in os.walk(directory)])
+    print(f"[INFO] Total files in {directory}: {total_files}")
+
 def clean_volume():
     print("[ACTION] Cleaning up /runpod-volume to free space...")
     try:
@@ -41,12 +46,16 @@ def clean_volume():
 
 def download_model():
     print("[STEP] Downloading model...")
+
     try:
+        # Check for the existing files in the cache before starting the download
+        check_files_in_cache(CACHE_DIR)
+        
         snapshot_download(
             repo_id="stabilityai/stable-diffusion-3.5-large",
             cache_dir=CACHE_DIR,
             local_dir=TARGET_DIR,
-            local_dir_use_symlinks=True,
+            local_dir_use_symlinks=False,  # Ensure it doesn't use symlinks
             use_auth_token=hf_token
         )
         print(f"[SUCCESS] Model downloaded to {TARGET_DIR}")
@@ -54,9 +63,8 @@ def download_model():
         if "Disk quota exceeded" in str(e):
             print("[ERROR] Disk quota exceeded.")
             show_disk_usage()
-            clean_volume()  # Clean volume, but do NOT attempt to download again
+            clean_volume()
             print("[INFO] Exiting without retrying download.")
-            exit(1)  # Exit to prevent looping
         else:
             print("[ERROR] OSError occurred:")
             traceback.print_exc()
@@ -66,5 +74,5 @@ def download_model():
 
 # Start process
 print("[START] RUN_SYNC_TRIGGERED is true. Starting script.")
-clean_volume()
-download_model()
+clean_volume()  # Clean the volume to free space
+download_model()  # Start downloading the model
