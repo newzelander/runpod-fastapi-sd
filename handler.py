@@ -1,10 +1,16 @@
 import os
 import shutil
+import logging
 from huggingface_hub import snapshot_download, login
+
+# Set up logging for maximum verbosity
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger()
 
 # Helper to get disk usage stats for /runpod-volume
 def get_volume_disk_usage(path="/runpod-volume"):
     total, used, free = shutil.disk_usage(path)
+    logger.debug(f"Disk usage - Total: {total} bytes, Used: {used} bytes, Free: {free} bytes")
     return {
         "total_gb": round(total / (1024 ** 3), 2),
         "used_gb": round(used / (1024 ** 3), 2),
@@ -14,6 +20,7 @@ def get_volume_disk_usage(path="/runpod-volume"):
 # Safely clear the contents of /runpod-volume without removing the mount point
 def clear_runpod_volume():
     folder = "/runpod-volume"
+    logger.debug("Clearing /runpod-volume...")
     for filename in os.listdir(folder):
         file_path = os.path.join(folder, filename)
         try:
@@ -22,11 +29,11 @@ def clear_runpod_volume():
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)  # remove directory
         except Exception as e:
-            print(f"Failed to delete {file_path}. Reason: {e}")
+            logger.error(f"Failed to delete {file_path}. Reason: {e}")
 
 def handler(event, context):
-    print("Handler invoked")
-    
+    logger.info("Handler invoked")
+
     # Extract input parameters from the event
     inputs = event.get("input", {})
     model_name = inputs.get("model")
@@ -34,27 +41,38 @@ def handler(event, context):
     max_disk_usage = float(inputs.get("max_disk_usage", 0.9))
     check_disk_space = inputs.get("check_disk_space", True)
 
-    # Ensure model name is provided in the event
     if not model_name:
+        logger.error("Error: Missing 'model' in input.")
         return {"error": "Missing 'model' in input."}
 
-    print("Clearing /runpod-volume...")
-    # Clean up the persistent volume
+    logger.info(f"Received model name: {model_name}")
+    logger.info(f"Cache directory: {cache_dir}")
+    logger.info(f"Max disk usage threshold: {max_disk_usage * 100}%")
+    
+    # Clean up the persistent volume if required
+    logger.info("Clearing /runpod-volume...")
     clear_runpod_volume()
 
     # Check disk space before downloading
     if check_disk_space:
         usage = shutil.disk_usage("/runpod-volume")
-        if usage.used / usage.total > max_disk_usage:
+        used_percentage = usage.used / usage.total
+        logger.info(f"Current disk usage: {used_percentage * 100}%")
+        if used_percentage > max_disk_usage:
+            logger.error("Error: Disk usage exceeds limit before download.")
             return {"error": "Disk usage exceeds limit before download. Volume has been cleared."}
 
     try:
-        print("Logging in to Hugging Face...")
-        # Login to Hugging Face with the provided token
-        login(token=os.environ.get("HF_TOKEN"))
+        # Log into Hugging Face
+        hf_token = os.environ.get("HF_TOKEN")
+        if not hf_token:
+            logger.error("Error: HF_TOKEN is not set.")
+            return {"error": "HF_TOKEN is not set."}
 
-        print(f"Downloading model: {model_name}")
-        # Download the model from Hugging Face
+        logger.info("Logging in to Hugging Face...")
+        login(token=hf_token)
+
+        logger.info(f"Downloading model: {model_name}")
         model_path = snapshot_download(
             repo_id=model_name,
             cache_dir=cache_dir,
@@ -62,7 +80,7 @@ def handler(event, context):
             resume_download=True
         )
 
-        print("Model downloaded successfully!")
+        logger.info(f"Model downloaded successfully to: {model_path}")
 
         # After download, report how much space is used
         disk_usage = get_volume_disk_usage()
@@ -70,11 +88,10 @@ def handler(event, context):
         return {
             "status": "Download complete",
             "model_path": model_path,
-            "disk_usage": disk_usage,
-            "message": "Model successfully downloaded and stored.",
+            "disk_usage": disk_usage
         }
 
     except Exception as e:
-        print(f"Error occurred: {str(e)}")
-        # If any exception occurs, return an error message
+        logger.error(f"Error occurred: {str(e)}")
         return {"error": str(e)}
+
