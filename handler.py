@@ -24,13 +24,15 @@ def clear_runpod_volume():
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
 
-def handler(event):
+def handler(event, context):
+    # Extract input parameters from the event
     inputs = event.get("input", {})
     model_name = inputs.get("model")
     cache_dir = inputs.get("cache_directory", "/runpod-volume/huggingface-cache")
     max_disk_usage = float(inputs.get("max_disk_usage", 0.9))
     check_disk_space = inputs.get("check_disk_space", True)
 
+    # Ensure model name is provided in the event
     if not model_name:
         return {"error": "Missing 'model' in input."}
 
@@ -44,10 +46,10 @@ def handler(event):
             return {"error": "Disk usage exceeds limit before download. Volume has been cleared."}
 
     try:
-        # Login to Hugging Face with the token
+        # Login to Hugging Face with the provided token
         login(token=os.environ.get("HF_TOKEN"))
 
-        # Download model
+        # Download the model from Hugging Face
         model_path = snapshot_download(
             repo_id=model_name,
             cache_dir=cache_dir,
@@ -65,4 +67,5 @@ def handler(event):
         }
 
     except Exception as e:
+        # If any exception occurs, return an error message
         return {"error": str(e)}
