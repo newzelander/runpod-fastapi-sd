@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 import runpod
 
 VOLUME_PATH = "/runpod-volume"
@@ -20,10 +21,17 @@ def remove_all(path):
         print(f"{path} does not exist.")
 
 def get_disk_usage():
-    total, used, free = shutil.disk_usage(VOLUME_PATH)
+    try:
+        output = subprocess.check_output(['du', '-sh', VOLUME_PATH]).decode('utf-8')
+        used = output.split()[0]
+    except Exception as e:
+        used = f"Error: {e}"
+
+    total, used_raw, free = shutil.disk_usage(VOLUME_PATH)
     return {
+        "used_by_runpod_volume": used,
         "total_gb": round(total / (1024**3), 2),
-        "used_gb": round(used / (1024**3), 2),
+        "used_gb": round(used_raw / (1024**3), 2),
         "free_gb": round(free / (1024**3), 2)
     }
 
