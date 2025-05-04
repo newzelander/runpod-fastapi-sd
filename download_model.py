@@ -2,7 +2,6 @@ import os
 import shutil
 from huggingface_hub import hf_hub_download
 import traceback
-import time
 
 # Get Hugging Face token securely
 hf_token = os.environ.get("HF_TOKEN")
@@ -15,15 +14,6 @@ os.environ["HF_HOME"] = "/runpod-volume/hf-cache"  # Ensure the cache uses the p
 # Define paths
 MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
 TARGET_DIR = "/runpod-volume/stable-diffusion"
-
-# Flag to indicate whether to run the download process
-RUN_SYNC_TRIGGERED = os.environ.get("RUN_SYNC_TRIGGERED", "false") == "true"  # Use this variable to trigger the execution
-
-# Function to simulate waiting for the RunSync trigger
-def wait_for_run_sync():
-    while not RUN_SYNC_TRIGGERED:
-        print("[INFO] Waiting for RunSync trigger...")
-        time.sleep(5)  # Sleep and wait for the trigger to be set to true
 
 # Disk usage and error handling functions
 def show_disk_usage():
@@ -47,45 +37,38 @@ def handle_quota_error():
 
     print("[INFO] Exiting without retrying download due to quota issue.")
 
-# Clear any existing files in the target directory
-def clear_existing_files():
+# Delete existing files in the target directory (free up space before download)
+def delete_existing_files():
     if os.path.exists(TARGET_DIR):
-        print(f"[INFO] Clearing existing files in {TARGET_DIR}...")
-        try:
-            shutil.rmtree(TARGET_DIR)  # Delete the existing directory and all its contents
-            os.makedirs(TARGET_DIR)    # Recreate the empty directory
-            print(f"[INFO] {TARGET_DIR} cleared.")
-        except Exception as e:
-            print(f"[ERROR] Failed to clear {TARGET_DIR}: {e}")
-            traceback.print_exc()
+        print("[INFO] Deleting existing files in the target directory...")
+        shutil.rmtree(TARGET_DIR)
+        os.makedirs(TARGET_DIR)
+        print(f"[INFO] All files deleted from {TARGET_DIR}.")
 
 # Model download function
 def download_model():
-    # Clear any existing files before starting the download
-    clear_existing_files()
-
-    # Force the download of the model
-    print(f"[INFO] Downloading model {MODEL_NAME} to {TARGET_DIR}...")
     os.makedirs(TARGET_DIR, exist_ok=True)
+    print(f"[INFO] Downloading model to {TARGET_DIR} using symlinks to save space...")
 
     try:
+        # Download model files and handle the symlink
         hf_hub_download(
             repo_id=MODEL_NAME,
             local_dir=TARGET_DIR,
             use_auth_token=hf_token,
             local_dir_use_symlinks=True
         )
-        print(f"[SUCCESS] Model downloaded to {TARGET_DIR}")
+        print(f"[SUCCESS] Model downloaded and symlinked to {TARGET_DIR}")
     except OSError as e:
         if "Disk quota exceeded" in str(e):
             handle_quota_error()
         else:
             print("[ERROR] Unexpected OS error:")
             traceback.print_exc()
-    except Exception:
+    except Exception as e:
         print("[ERROR] Unexpected exception occurred:")
         traceback.print_exc()
 
 if __name__ == "__main__":
-    wait_for_run_sync()  # Wait until the RunSync button is pressed and triggered
-    download_model()  # Download model after clearing existing files
+    delete_existing_files()  # Delete any existing files before downloading the model
+    download_model()  # Download the model
