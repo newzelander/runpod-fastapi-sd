@@ -16,11 +16,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the Python script for downloading the model
+# Copy the handler script and model download script
+COPY handler.py .
 COPY download_model.py .
 
-# Optionally, set the Hugging Face token as an environment variable (can also pass via runtime)
-# ENV HUGGING_FACE_HUB_TOKEN=your_token_here
-
-# Set the command to run the Python script
-CMD ["python", "download_model.py"]
+# Set the command to run the handler script
+CMD ["python", "handler.py"]
