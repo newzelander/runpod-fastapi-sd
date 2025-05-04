@@ -1,80 +1,88 @@
+import subprocess
 import os
 import shutil
-import subprocess
-from huggingface_hub import snapshot_download
-import traceback
+import time
+import sys
+import huggingface_hub
 
-# Read environment variables
-hf_token = os.environ.get("HF_TOKEN")
-if not hf_token:
-    raise ValueError("HF_TOKEN environment variable is not set.")
+# The path to the directory where the model files should be saved
+HF_CACHE_DIR = "/runpod-volume/hf-cache"
+TARGET_DIR = "/runpod-volume"
 
-run_sync_triggered = os.environ.get("RUN_SYNC_TRIGGERED", "false").lower() == "true"
-if not run_sync_triggered:
-    print("[INFO] RUN_SYNC_TRIGGERED is not set to true. Exiting.")
-    exit(0)
-
-# Define paths
-CACHE_DIR = "/runpod-volume/hf-cache"
-TARGET_DIR = "/runpod-volume/stable-diffusion"
-
-# Set Hugging Face cache location
-os.environ["HF_HOME"] = CACHE_DIR
-
-def show_disk_usage():
-    total, used, free = shutil.disk_usage("/runpod-volume")
-    print(f"[DISK] Total: {total // (2**20)} MB")
-    print(f"[DISK] Used: {used // (2**20)} MB")
-    print(f"[DISK] Free: {free // (2**20)} MB")
-    return free
-
-def clean_volume():
-    print("[ACTION] Cleaning up /runpod-volume (including hf-cache)...")
+# Helper function to check the available disk space of /runpod-volume
+def get_persistent_disk_usage():
     try:
-        # Delete everything in /runpod-volume (including hf-cache)
-        for item in os.listdir("/runpod-volume"):
-            item_path = os.path.join("/runpod-volume", item)
-            if os.path.isdir(item_path) or os.path.isfile(item_path):
-                shutil.rmtree(item_path)
-        print("[SUCCESS] /runpod-volume cleaned.")
+        # Running `df -h` to get disk usage info for /runpod-volume
+        result = subprocess.check_output(['df', '-h', '/runpod-volume']).decode('utf-8')
+        # Extracting relevant disk information from the result
+        for line in result.splitlines():
+            if '/runpod-volume' in line:
+                parts = line.split()
+                total = parts[1]  # Total space
+                used = parts[2]   # Used space
+                available = parts[3]  # Available space
+                return total, used, available
+        return None, None, None
     except Exception as e:
-        print(f"[ERROR] Failed to clean /runpod-volume: {e}")
+        print(f"Error getting disk usage: {e}")
+        return None, None, None
 
-def download_model():
-    print("[STEP] Downloading model...")
-
+# Function to clean the /runpod-volume directory, excluding hf-cache
+def clean_runpod_volume():
     try:
-        free_space = show_disk_usage()
+        print(f"[ACTION] Cleaning up {TARGET_DIR} (including hf-cache)...")
+        # Delete everything except hf-cache
+        for root, dirs, files in os.walk(TARGET_DIR, topdown=False):
+            for name in files:
+                file_path = os.path.join(root, name)
+                if HF_CACHE_DIR not in file_path:
+                    os.remove(file_path)
+            for name in dirs:
+                dir_path = os.path.join(root, name)
+                if HF_CACHE_DIR not in dir_path:
+                    shutil.rmtree(dir_path)
+        print(f"[SUCCESS] {TARGET_DIR} cleaned.")
+    except Exception as e:
+        print(f"[ERROR] Failed to clean {TARGET_DIR}: {e}")
 
-        # Assuming model size is approximately 26GB (26 * 1024MB)
-        required_space = 26 * 1024
-        if free_space < required_space:
-            print(f"[ERROR] Not enough disk space! Needed: {required_space}MB, Available: {free_space}MB.")
-            return
+# Function to download the model
+def download_model(model_name):
+    try:
+        print(f"[STEP] Downloading model {model_name}...")
+        # Assuming huggingface_hub.download_url works correctly and does not conflict with symlinks
+        huggingface_hub.snapshot_download(model_name, cache_dir=HF_CACHE_DIR)
+        print(f"[INFO] Model {model_name} downloaded successfully.")
+    except Exception as e:
+        print(f"[ERROR] Failed to download model: {e}")
 
-        print("[INFO] Starting model download...")
-        snapshot_download(
-            repo_id="stabilityai/stable-diffusion-3.5-large",
-            cache_dir=CACHE_DIR,
-            local_dir=TARGET_DIR,
-            local_dir_use_symlinks=False,
-            use_auth_token=hf_token
-        )
-        print(f"[SUCCESS] Model downloaded to {TARGET_DIR}")
+# Main function
+def main(model_name):
+    print(f"[START] RUN_SYNC_TRIGGERED is true. Starting script.")
 
-    except OSError as e:
-        if "Disk quota exceeded" in str(e):
-            print("[ERROR] Disk quota exceeded.")
-            show_disk_usage()
-            print("[INFO] Exiting without retrying download.")
-        else:
-            print("[ERROR] OSError occurred:")
-            traceback.print_exc()
-    except Exception:
-        print("[ERROR] Unexpected exception occurred:")
-        traceback.print_exc()
+    # Get disk usage information for /runpod-volume
+    total, used, available = get_persistent_disk_usage()
 
-# Start process
-print("[START] RUN_SYNC_TRIGGERED is true. Starting script.")
-clean_volume()  # Clean everything including hf-cache
-download_model()  # Download model once
+    if total and available:
+        print(f"[DISK] Total: {total}")
+        print(f"[DISK] Used: {used}")
+        print(f"[DISK] Free: {available}")
+    else:
+        print("[ERROR] Could not retrieve disk space information.")
+
+    # Clean up the volume (including hf-cache) before starting the download
+    clean_runpod_volume()
+
+    # Download the model
+    download_model(model_name)
+
+    # Checking if the model was downloaded (files in hf-cache directory)
+    model_files = os.listdir(HF_CACHE_DIR)
+    if len(model_files) > 0:
+        print(f"[INFO] Total files in {HF_CACHE_DIR}: {len(model_files)}")
+    else:
+        print(f"[INFO] No files found in {HF_CACHE_DIR}, model might not have been downloaded correctly.")
+
+# Run the script
+if __name__ == "__main__":
+    model_name = "your_model_name_here"  # Replace with your model name
+    main(model_name)
