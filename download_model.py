@@ -47,9 +47,24 @@ def handle_quota_error():
 
     print("[INFO] Exiting without retrying download due to quota issue.")
 
+# Clear any existing files in the target directory
+def clear_existing_files():
+    if os.path.exists(TARGET_DIR):
+        print(f"[INFO] Clearing existing files in {TARGET_DIR}...")
+        try:
+            shutil.rmtree(TARGET_DIR)  # Delete the existing directory and all its contents
+            os.makedirs(TARGET_DIR)    # Recreate the empty directory
+            print(f"[INFO] {TARGET_DIR} cleared.")
+        except Exception as e:
+            print(f"[ERROR] Failed to clear {TARGET_DIR}: {e}")
+            traceback.print_exc()
+
 # Model download function
 def download_model():
-    # Force the download of the model even if it already exists
+    # Clear any existing files before starting the download
+    clear_existing_files()
+
+    # Force the download of the model
     print(f"[INFO] Downloading model {MODEL_NAME} to {TARGET_DIR}...")
     os.makedirs(TARGET_DIR, exist_ok=True)
 
@@ -73,4 +88,4 @@ def download_model():
 
 if __name__ == "__main__":
     wait_for_run_sync()  # Wait until the RunSync button is pressed and triggered
-    download_model()  # Download model, even if it exists
+    download_model()  # Download model after clearing existing files
