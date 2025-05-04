@@ -45,15 +45,14 @@ def download_model():
     print(f"[INFO] Downloading model to {TARGET_DIR} using symlinks to save space...")
 
     try:
-        # Download the model files
-        model_files = hf_hub_download(
+        # Download model files and handle the symlink
+        hf_hub_download(
             repo_id=MODEL_NAME,
             local_dir=TARGET_DIR,
             use_auth_token=hf_token,
-            local_dir_use_symlinks=True,
-            revision="main"  # You can adjust this if you want a specific revision/version
+            local_dir_use_symlinks=True
         )
-        print(f"[SUCCESS] Model symlinked to {TARGET_DIR}")
+        print(f"[SUCCESS] Model downloaded and symlinked to {TARGET_DIR}")
     except OSError as e:
         if "Disk quota exceeded" in str(e):
             handle_quota_error()
