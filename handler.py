@@ -3,32 +3,32 @@ import shutil
 from huggingface_hub import snapshot_download, login
 import runpod
 
-# Helper to get disk usage stats for /runpod-volume
+# Get disk usage for the /runpod-volume (in GB)
 def get_volume_disk_usage(path="/runpod-volume"):
     total, used, free = shutil.disk_usage(path)
     return {
-        "total_gb": round(total / (1024 ** 3), 2),
+        "total_gb": round(total / (1024 ** 3), 2),  # Convert bytes to GB
         "used_gb": round(used / (1024 ** 3), 2),
         "free_gb": round(free / (1024 ** 3), 2)
     }
 
-# Safely clear the contents of /runpod-volume without removing the mount point
+# Clear /runpod-volume
 def clear_runpod_volume():
     folder = "/runpod-volume"
     for filename in os.listdir(folder):
         file_path = os.path.join(folder, filename)
         try:
             if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)  # remove file or link
+                os.unlink(file_path)
             elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)  # remove directory
+                shutil.rmtree(file_path)
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
 
-# ❗ FIXED: Remove context — only accept one argument
-def handler(event):
+def handler(event, context):
     print(f"Event: {event}")
-    
+    print(f"Context: {context}")
+
     inputs = event.get("input", {})
     model_name = inputs.get("model")
     cache_dir = inputs.get("cache_directory", "/runpod-volume/huggingface-cache")
@@ -42,8 +42,11 @@ def handler(event):
     clear_runpod_volume()
 
     if check_disk_space:
-        usage = shutil.disk_usage("/runpod-volume")
-        if usage.used / usage.total > max_disk_usage:
+        usage_before = get_volume_disk_usage()
+        print(f"Disk usage before download (for /runpod-volume): {usage_before}")
+        
+        if (shutil.disk_usage("/runpod-volume").used /
+                shutil.disk_usage("/runpod-volume").total) > max_disk_usage:
             return {"error": "Disk usage exceeds limit before download. Volume has been cleared."}
 
     try:
@@ -55,20 +58,23 @@ def handler(event):
             repo_id=model_name,
             cache_dir=cache_dir,
             local_files_only=False,
-            resume_download=True
+            force_download=True  # Ensure no duplication
         )
 
-        disk_usage = get_volume_disk_usage()
+        # Check disk usage after download
+        usage_after = get_volume_disk_usage()
+        print(f"Disk usage after download (for /runpod-volume): {usage_after}")
 
         return {
             "status": "Download complete",
             "model_path": model_path,
-            "disk_usage": disk_usage
+            "disk_usage_before": usage_before,
+            "disk_usage_after": usage_after
         }
 
     except Exception as e:
         print(f"Error occurred: {str(e)}")
         return {"error": str(e)}
 
-# ✅ Required for serverless
+# Ensure serverless worker is started
 runpod.serverless.start({"handler": handler})
