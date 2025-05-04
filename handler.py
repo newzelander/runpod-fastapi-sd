@@ -1,9 +1,7 @@
 import os
 import shutil
-import subprocess
-from runpod.serverless.modules.rp_handler import RunPodHandler
 from huggingface_hub import snapshot_download, login
-import shutil
+import runpod
 
 # Helper to get disk usage stats for /runpod-volume
 def get_volume_disk_usage(path="/runpod-volume"):
@@ -14,8 +12,8 @@ def get_volume_disk_usage(path="/runpod-volume"):
         "free_gb": round(free / (1024 ** 3), 2)
     }
 
-def handler(event):
-    inputs = event.get("input", {})
+def handler(job):
+    inputs = job.get("input", {})
     model_name = inputs.get("model")
     cache_dir = inputs.get("cache_directory", "/runpod-volume/huggingface-cache")
     max_disk_usage = float(inputs.get("max_disk_usage", 0.9))
@@ -57,5 +55,5 @@ def handler(event):
     except Exception as e:
         return {"error": str(e)}
 
-# Register handler
-handler = RunPodHandler(handler)
+# Start the RunPod serverless handler
+runpod.serverless.start({"handler": handler})
