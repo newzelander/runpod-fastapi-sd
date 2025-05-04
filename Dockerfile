@@ -1,8 +1,9 @@
-FROM python:3.10-slim
+FROM python:3.10-slim-bullseye
 
-# Avoid interactive prompts during package installation
+# Set environment variable to avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Set working directory
 WORKDIR /app
 
 # Install necessary system dependencies
@@ -17,12 +18,12 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python dependencies
+# Copy requirements.txt and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy handler script
+# Copy the handler script
 COPY handler.py .
 
-# Set the command to run the handler
+# Set the command to run the handler script
 CMD ["python", "handler.py"]
