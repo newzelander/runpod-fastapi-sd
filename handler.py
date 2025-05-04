@@ -1,80 +1,69 @@
 import os
 import shutil
-from huggingface_hub import snapshot_download, login
-import runpod
+import logging
+import subprocess
+import time
+import psutil
+import runpod.serverless
 
-# Get disk usage for the /runpod-volume (in GB)
-def get_volume_disk_usage(path="/runpod-volume"):
-    total, used, free = shutil.disk_usage(path)
-    return {
-        "total_gb": round(total / (1024 ** 3), 2),  # Convert bytes to GB
-        "used_gb": round(used / (1024 ** 3), 2),
-        "free_gb": round(free / (1024 ** 3), 2)
-    }
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
 
-# Clear /runpod-volume
-def clear_runpod_volume():
-    folder = "/runpod-volume"
-    for filename in os.listdir(folder):
-        file_path = os.path.join(folder, filename)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
-        except Exception as e:
-            print(f"Failed to delete {file_path}. Reason: {e}")
+# Constants for disk usage check
+DISK_PATH = "/runpod-volume"  # The directory to check disk usage for
+MAX_DISK_USAGE = 0.9  # Maximum allowed disk usage (90%)
 
-def handler(event, context):
-    print(f"Event: {event}")
-    print(f"Context: {context}")
+def check_disk_usage():
+    """Check the disk usage of the persistent volume"""
+    disk_usage = psutil.disk_usage(DISK_PATH)
+    used = disk_usage.used / (1024 * 1024 * 1024)  # Convert bytes to GB
+    total = disk_usage.total / (1024 * 1024 * 1024)  # Convert bytes to GB
+    free = disk_usage.free / (1024 * 1024 * 1024)  # Convert bytes to GB
+    logging.info(f"Disk Usage: {used:.2f}GB used, {free:.2f}GB free, {total:.2f}GB total.")
+    return used, free, total
 
-    inputs = event.get("input", {})
-    model_name = inputs.get("model")
-    cache_dir = inputs.get("cache_directory", "/runpod-volume/huggingface-cache")
-    max_disk_usage = float(inputs.get("max_disk_usage", 0.9))
-    check_disk_space = inputs.get("check_disk_space", True)
+def download_model(event):
+    """Download the model and handle the event"""
+    # Get model details from the event
+    model_name = event.get("model", "stabilityai/stable-diffusion-3.5-large")
+    logging.info(f"Starting download for model: {model_name}")
+    
+    # Log disk usage before download
+    used_before, free_before, total_before = check_disk_usage()
 
-    if not model_name:
-        return {"error": "Missing 'model' in input."}
+    # Simulate model download process (you will replace this with the actual download code)
+    # Example: subprocess.run(f"wget {model_name}", shell=True)
+    # We simulate a model download here by sleeping for 5 seconds
+    time.sleep(5)  # Simulate download time
 
-    print("Clearing /runpod-volume...")
-    clear_runpod_volume()
+    # Log disk usage after download
+    used_after, free_after, total_after = check_disk_usage()
 
-    if check_disk_space:
-        usage_before = get_volume_disk_usage()
-        print(f"Disk usage before download (for /runpod-volume): {usage_before}")
-        
-        if (shutil.disk_usage("/runpod-volume").used /
-                shutil.disk_usage("/runpod-volume").total) > max_disk_usage:
-            return {"error": "Disk usage exceeds limit before download. Volume has been cleared."}
+    # Check if disk space exceeded during download
+    if used_after > MAX_DISK_USAGE * total_after:
+        logging.error("Disk quota exceeded during model download.")
+        return {"status": "failure", "message": "Disk quota exceeded during model download."}
 
+    # Return a success message
+    return {"status": "success", "message": "Model download complete"}
+
+def handler(event):
+    """Main handler function that processes the event"""
     try:
-        print("Logging in to Hugging Face...")
-        login(token=os.environ.get("HF_TOKEN"))
+        logging.info(f"Received event: {event}")
+        
+        # Ensure event contains the necessary data
+        if not event.get("model"):
+            return {"status": "failure", "message": "Model name missing in event data"}
+        
+        # Call the download model function
+        result = download_model(event)
 
-        print(f"Downloading model: {model_name}")
-        model_path = snapshot_download(
-            repo_id=model_name,
-            cache_dir=cache_dir,
-            local_files_only=False,
-            force_download=True  # Ensure no duplication
-        )
-
-        # Check disk usage after download
-        usage_after = get_volume_disk_usage()
-        print(f"Disk usage after download (for /runpod-volume): {usage_after}")
-
-        return {
-            "status": "Download complete",
-            "model_path": model_path,
-            "disk_usage_before": usage_before,
-            "disk_usage_after": usage_after
-        }
+        return result
 
     except Exception as e:
-        print(f"Error occurred: {str(e)}")
-        return {"error": str(e)}
+        logging.error(f"Error occurred: {e}")
+        return {"status": "failure", "message": str(e)}
 
-# Ensure serverless worker is started
+# Start the RunPod serverless worker with the handler function
 runpod.serverless.start({"handler": handler})
