@@ -1,19 +1,31 @@
 import os
 import shutil
+from huggingface_hub import hf_hub_download
 import traceback
 import time
-from huggingface_hub import hf_hub_download
 
-# Set Hugging Face token and cache path
+# Get Hugging Face token securely
 hf_token = os.environ.get("HF_TOKEN")
 if not hf_token:
     raise ValueError("HF_TOKEN environment variable is not set.")
 
-os.environ["HF_HOME"] = "/runpod-volume/hf-cache"
+# Set Hugging Face cache to persistent directory
+os.environ["HF_HOME"] = "/runpod-volume/hf-cache"  # Ensure the cache uses the persistent volume
 
+# Define paths
 MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
 TARGET_DIR = "/runpod-volume/stable-diffusion"
 
+# Flag to indicate whether to run the download process
+RUN_SYNC_TRIGGERED = os.environ.get("RUN_SYNC_TRIGGERED", "false") == "true"  # Use this variable to trigger the execution
+
+# Function to simulate waiting for the RunSync trigger
+def wait_for_run_sync():
+    while not RUN_SYNC_TRIGGERED:
+        print("[INFO] Waiting for RunSync trigger...")
+        time.sleep(5)  # Sleep and wait for the trigger to be set to true
+
+# Disk usage and error handling functions
 def show_disk_usage():
     total, used, free = shutil.disk_usage("/runpod-volume")
     print(f"[DISK] Total: {total // (2**20)} MB")
@@ -22,23 +34,22 @@ def show_disk_usage():
 
 def handle_quota_error():
     print("[ERROR] Disk quota exceeded.")
+    print("[ACTION] Showing current disk usage:")
     show_disk_usage()
-    print("[ACTION] Cleaning up volume...")
+
+    print("[ACTION] Cleaning up /runpod-volume to free space...")
     try:
         shutil.rmtree("/runpod-volume")
         os.makedirs("/runpod-volume")
         print("[SUCCESS] Volume cleaned.")
     except Exception as cleanup_err:
-        print(f"[FAILURE] Cleanup failed: {cleanup_err}")
+        print(f"[FAILURE] Could not clean volume: {cleanup_err}")
 
+    print("[INFO] Exiting without retrying download due to quota issue.")
+
+# Model download function
 def download_model():
-    required_files = ["model_index.json"]
-    model_ready = all(os.path.exists(os.path.join(TARGET_DIR, f)) for f in required_files)
-
-    if model_ready:
-        print(f"[INFO] Model already downloaded at {TARGET_DIR}.")
-        return
-
+    # Force the download of the model even if it already exists
     print(f"[INFO] Downloading model {MODEL_NAME} to {TARGET_DIR}...")
     os.makedirs(TARGET_DIR, exist_ok=True)
 
@@ -61,9 +72,5 @@ def download_model():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    if os.environ.get("RUNPOD_RUNSYNC") != "true":
-        print("[INFO] Not triggered by RunSync. Exiting.")
-        exit(0)
-
-    print("[INFO] RunSync trigger detected. Proceeding...")
-    download_model()
+    wait_for_run_sync()  # Wait until the RunSync button is pressed and triggered
+    download_model()  # Download model, even if it exists
