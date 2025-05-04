@@ -21,26 +21,25 @@ TARGET_DIR = "/runpod-volume/stable-diffusion"
 os.environ["HF_HOME"] = CACHE_DIR
 
 def show_disk_usage():
-    total, used, free = shutil.disk_usage("/runpod-volume")
-    print(f"[DISK] Total: {total // (2**20)} MB")
-    print(f"[DISK] Used: {used // (2**20)} MB")
-    print(f"[DISK] Free: {free // (2**20)} MB")
+    total, used, free = shutil.disk_usage("/")  # Check the root directory or the relevant mount point
+    print(f"[DISK] Total: {total // (2**30)} GB")
+    print(f"[DISK] Used: {used // (2**30)} GB")
+    print(f"[DISK] Free: {free // (2**30)} GB")
 
 def check_files_in_cache(directory):
     total_files = sum([len(files) for r, d, files in os.walk(directory)])
     print(f"[INFO] Total files in {directory}: {total_files}")
 
 def clean_volume():
-    print("[ACTION] Cleaning up /runpod-volume to free space (including hf-cache)...")
+    print("[ACTION] Cleaning up /runpod-volume (including hf-cache)...")
     try:
-        # Deleting everything in /runpod-volume, including hf-cache
         for item in os.listdir("/runpod-volume"):
             item_path = os.path.join("/runpod-volume", item)
             if os.path.isfile(item_path) or os.path.islink(item_path):
                 os.unlink(item_path)
             elif os.path.isdir(item_path):
                 shutil.rmtree(item_path)
-        print("[SUCCESS] /runpod-volume cleaned (hf-cache deleted as well).")
+        print("[SUCCESS] /runpod-volume cleaned.")
     except Exception as e:
         print(f"[ERROR] Failed to clean /runpod-volume: {e}")
 
@@ -55,15 +54,29 @@ def download_model():
     print("[STEP] Downloading model...")
 
     try:
+        # Check if the model already exists in the cache folder
         check_files_in_cache(CACHE_DIR)
 
+        # Check available disk space before downloading (on the root or relevant volume)
+        total, used, free = shutil.disk_usage("/")  # Checking root disk usage
+        print(f"[DISK] Total: {total // (2**30)} GB")
+        print(f"[DISK] Used: {used // (2**30)} GB")
+        print(f"[DISK] Free: {free // (2**30)} GB")
+
+        # Ensure there's enough space for the model
+        model_size_gb = 26  # Adjust this to the actual model size
+        if free // (2**30) < model_size_gb:
+            print(f"[ERROR] Not enough free space to download the model.")
+            print(f"[INFO] Exiting without retrying download.")
+            return
+
+        # Proceed to download the model
         snapshot_download(
             repo_id="stabilityai/stable-diffusion-3.5-large",
             cache_dir=CACHE_DIR,
-            local_dir=TARGET_DIR,  # Download directly into TARGET_DIR, no symlinks
             use_auth_token=hf_token
         )
-        print(f"[SUCCESS] Model downloaded to {TARGET_DIR}")
+        print(f"[SUCCESS] Model downloaded to {CACHE_DIR}")
         reset_trigger_flag()
     except OSError as e:
         if "Disk quota exceeded" in str(e):
@@ -80,5 +93,5 @@ def download_model():
 
 # Start process
 print("[START] RUN_SYNC_TRIGGERED is true. Starting script.")
-clean_volume()  # Clean everything, including the cache
-download_model()  # Download model
+clean_volume()  # Clean everything before starting
+download_model()  # Download the model
