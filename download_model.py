@@ -14,9 +14,9 @@ if not hf_token:
 
 # Function to check disk space
 def check_disk_space(threshold=0.90):
-    total, used, free = shutil.disk_usage("/")
+    total, used, free = shutil.disk_usage(volume_dir)  # Check space only in the persistent volume
     disk_usage = used / total
-    print(f"Disk usage: {disk_usage * 100:.2f}%")
+    print(f"Disk usage of persistent volume: {disk_usage * 100:.2f}%")
     return disk_usage < threshold
 
 # Function to clear the volume directory
@@ -26,13 +26,13 @@ def clear_volume():
         shutil.rmtree(volume_dir)
     os.makedirs(volume_dir)  # Recreate the volume directory
 
-# Function to show disk space usage
+# Function to show disk space usage for the persistent volume
 def show_disk_usage():
-    total, used, free = shutil.disk_usage("/")
-    print(f"Total disk space: {total // (2**30)} GB")
-    print(f"Used disk space: {used // (2**30)} GB")
-    print(f"Free disk space: {free // (2**30)} GB")
-    print(f"Current disk usage: {used / total * 100:.2f}%")
+    total, used, free = shutil.disk_usage(volume_dir)  # Use the persistent volume path
+    print(f"Total disk space in persistent volume: {total // (2**30)} GB")
+    print(f"Used disk space in persistent volume: {used // (2**30)} GB")
+    print(f"Free disk space in persistent volume: {free // (2**30)} GB")
+    print(f"Current disk usage of persistent volume: {used / total * 100:.2f}%")
 
 # Function to download the model
 def download_model():
