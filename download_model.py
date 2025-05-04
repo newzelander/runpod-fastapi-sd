@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 import traceback
 from huggingface_hub import snapshot_download
 
@@ -21,10 +22,16 @@ TARGET_DIR = "/runpod-volume/stable-diffusion"
 os.environ["HF_HOME"] = CACHE_DIR
 
 def show_disk_usage():
-    total, used, free = shutil.disk_usage("/")  # Check the root directory or the relevant mount point
-    print(f"[DISK] Total: {total // (2**30)} GB")
-    print(f"[DISK] Used: {used // (2**30)} GB")
-    print(f"[DISK] Free: {free // (2**30)} GB")
+    try:
+        # Get actual size of /runpod-volume using 'du -sh' command
+        output = subprocess.check_output(['du', '-sh', '/runpod-volume']).decode('utf-8')
+        
+        # Output is like "12G   /runpod-volume"
+        size = output.split()[0]
+        
+        print(f"[DISK] Used space: {size}")
+    except Exception as e:
+        print(f"[ERROR] Failed to check disk usage: {str(e)}")
 
 def check_files_in_cache(directory):
     total_files = sum([len(files) for r, d, files in os.walk(directory)])
@@ -57,15 +64,18 @@ def download_model():
         # Check if the model already exists in the cache folder
         check_files_in_cache(CACHE_DIR)
 
-        # Check available disk space before downloading (on the root or relevant volume)
-        total, used, free = shutil.disk_usage("/")  # Checking root disk usage
-        print(f"[DISK] Total: {total // (2**30)} GB")
-        print(f"[DISK] Used: {used // (2**30)} GB")
-        print(f"[DISK] Free: {free // (2**30)} GB")
+        # Check available disk space before downloading (using subprocess for accurate result)
+        show_disk_usage()
 
         # Ensure there's enough space for the model
-        model_size_gb = 26  # Adjust this to the actual model size
-        if free // (2**30) < model_size_gb:
+        model_size_gb = 26  # Adjust this to the actual model size (in GB)
+        
+        # You can use the `subprocess` output to calculate the free space and compare
+        output = subprocess.check_output(['du', '-sh', '/runpod-volume']).decode('utf-8')
+        free_space = output.split()[0]
+        
+        # Assuming free_space is in GB, adjust parsing if needed (e.g. "12G" or "1.5G")
+        if float(free_space[:-1]) < model_size_gb:
             print(f"[ERROR] Not enough free space to download the model.")
             print(f"[INFO] Exiting without retrying download.")
             return
