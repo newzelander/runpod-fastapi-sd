@@ -15,7 +15,7 @@ if not run_sync_triggered:
 
 # Define paths
 CACHE_DIR = "/runpod-volume/hf-cache"
-TARGET_DIR = "/runpod-volume/stable-diffusion"
+TARGET_DIR = "/runpod-volume/stable-diffusion"  # This is kept for potential later use
 
 # Set Hugging Face cache location
 os.environ["HF_HOME"] = CACHE_DIR
@@ -40,17 +40,15 @@ def clean_volume():
         print(f"[ERROR] Failed to clean /runpod-volume: {e}")
 
 def download_model():
-    print("[STEP] Downloading model with symlinks...")
+    print("[STEP] Downloading model...")
 
     try:
         snapshot_download(
             repo_id="stabilityai/stable-diffusion-3.5-large",
-            cache_dir=CACHE_DIR,
-            local_dir=TARGET_DIR,
-            local_dir_use_symlinks=True,
+            cache_dir=CACHE_DIR,  # Downloads directly to the hf-cache directory
             use_auth_token=hf_token
         )
-        print(f"[SUCCESS] Model downloaded to {TARGET_DIR}")
+        print(f"[SUCCESS] Model downloaded to {CACHE_DIR}")
     except OSError as e:
         if "Disk quota exceeded" in str(e):
             print("[ERROR] Disk quota exceeded.")
