@@ -2,16 +2,19 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install dependencies from requirements.txt
+# Install system dependencies
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the handler script to the container
-COPY handler.py .
+# Copy source files
+COPY . .
 
-# Ensure the environment variables are set (e.g., HF_TOKEN)
-# You can override this when running the container using the -e flag if needed
-ENV HF_TOKEN=your_huggingface_token_here
+# Required env for huggingface caching (optional)
+ENV HF_HOME=/runpod-volume/.cache/huggingface
+ENV TRANSFORMERS_CACHE=/runpod-volume/.cache/huggingface/transformers
+ENV HF_HUB_CACHE=/runpod-volume/.cache/huggingface/hub
 
-# Start the script directly
 CMD ["python", "handler.py"]
