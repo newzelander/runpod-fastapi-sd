@@ -1,7 +1,7 @@
 import os
 import shutil
 from huggingface_hub import snapshot_download, login
-import runpod  # this is all that's needed for the final line to work
+import runpod
 
 # Helper to get disk usage stats for /runpod-volume
 def get_volume_disk_usage(path="/runpod-volume"):
@@ -25,27 +25,22 @@ def clear_runpod_volume():
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
 
-def handler(event, context):
-    # Debugging output
+# ❗ FIXED: Remove context — only accept one argument
+def handler(event):
     print(f"Event: {event}")
-    print(f"Context: {context}")
     
-    # Extract input parameters from the event
     inputs = event.get("input", {})
     model_name = inputs.get("model")
     cache_dir = inputs.get("cache_directory", "/runpod-volume/huggingface-cache")
     max_disk_usage = float(inputs.get("max_disk_usage", 0.9))
     check_disk_space = inputs.get("check_disk_space", True)
 
-    # Ensure model name is provided in the event
     if not model_name:
         return {"error": "Missing 'model' in input."}
 
     print("Clearing /runpod-volume...")
-    # Clean up the persistent volume
     clear_runpod_volume()
 
-    # Check disk space before downloading
     if check_disk_space:
         usage = shutil.disk_usage("/runpod-volume")
         if usage.used / usage.total > max_disk_usage:
@@ -53,11 +48,9 @@ def handler(event, context):
 
     try:
         print("Logging in to Hugging Face...")
-        # Login to Hugging Face with the provided token
         login(token=os.environ.get("HF_TOKEN"))
 
         print(f"Downloading model: {model_name}")
-        # Download the model from Hugging Face
         model_path = snapshot_download(
             repo_id=model_name,
             cache_dir=cache_dir,
@@ -65,7 +58,6 @@ def handler(event, context):
             resume_download=True
         )
 
-        # After download, report how much space is used
         disk_usage = get_volume_disk_usage()
 
         return {
@@ -76,8 +68,7 @@ def handler(event, context):
 
     except Exception as e:
         print(f"Error occurred: {str(e)}")
-        # If any exception occurs, return an error message
         return {"error": str(e)}
 
-# 🟩 THE ONLY THING ADDED — this is what makes it run on Runpod
+# ✅ Required for serverless
 runpod.serverless.start({"handler": handler})
