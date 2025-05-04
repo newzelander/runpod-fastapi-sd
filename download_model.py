@@ -3,13 +3,13 @@ import shutil
 from huggingface_hub import hf_hub_download
 import traceback
 
-# Optional: Set HF_HOME to use /runpod-volume as cache too (avoid duplicate caching if needed)
-os.environ["HF_HOME"] = "/runpod-volume/hf-cache"
-
-# Get Hugging Face token from environment
+# Get Hugging Face token securely
 hf_token = os.environ.get("HF_TOKEN")
 if not hf_token:
     raise ValueError("HF_TOKEN environment variable is not set.")
+
+# Set Hugging Face cache to persistent directory
+os.environ["HF_HOME"] = "/runpod-volume/hf-cache"  # Ensure the cache uses the persistent volume
 
 # Define paths
 MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
@@ -45,11 +45,13 @@ def download_model():
     print(f"[INFO] Downloading model to {TARGET_DIR} using symlinks to save space...")
 
     try:
-        hf_hub_download(
+        # Download the model files
+        model_files = hf_hub_download(
             repo_id=MODEL_NAME,
             local_dir=TARGET_DIR,
+            use_auth_token=hf_token,
             local_dir_use_symlinks=True,
-            use_auth_token=hf_token
+            revision="main"  # You can adjust this if you want a specific revision/version
         )
         print(f"[SUCCESS] Model symlinked to {TARGET_DIR}")
     except OSError as e:
