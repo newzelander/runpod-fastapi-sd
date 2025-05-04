@@ -6,7 +6,7 @@ VOLUME_PATH = "/runpod-volume"
 
 def get_disk_usage(path):
     total, used, free = shutil.disk_usage(path)
-    return f"Total: {total // (2**30)} GB, Used: {used // (2**30)} GB, Free: {free // (2**30)} GB"
+    return f"Total: {total // (2**30)} GB, Used: {used // (2**30)} GB, Free: {free // (2**30)} GB}"
 
 def clean_directory(path):
     print(f"Cleaning directory: {path}")
