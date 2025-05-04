@@ -13,9 +13,8 @@ if not run_sync_triggered:
     print("[INFO] RUN_SYNC_TRIGGERED is not set to true. Exiting.")
     exit(0)
 
-# Define paths
+# Define cache path
 CACHE_DIR = "/runpod-volume/hf-cache"
-TARGET_DIR = "/runpod-volume/stable-diffusion"
 
 # Set Hugging Face cache location
 os.environ["HF_HOME"] = CACHE_DIR
@@ -27,38 +26,46 @@ def show_disk_usage():
     print(f"[DISK] Free: {free // (2**20)} MB")
 
 def check_files_in_cache(directory):
-    # List all files in the cache directory
     total_files = sum([len(files) for r, d, files in os.walk(directory)])
     print(f"[INFO] Total files in {directory}: {total_files}")
 
 def clean_volume():
-    print("[ACTION] Cleaning up /runpod-volume to free space...")
+    print("[ACTION] Cleaning up /runpod-volume to free space (except hf-cache)...")
     try:
         for item in os.listdir("/runpod-volume"):
+            if item == "hf-cache":
+                continue  # Preserve the Hugging Face cache
             item_path = os.path.join("/runpod-volume", item)
             if os.path.isfile(item_path) or os.path.islink(item_path):
                 os.unlink(item_path)
             elif os.path.isdir(item_path):
                 shutil.rmtree(item_path)
-        print("[SUCCESS] /runpod-volume cleaned.")
+        print("[SUCCESS] /runpod-volume cleaned (cache preserved).")
     except Exception as e:
         print(f"[ERROR] Failed to clean /runpod-volume: {e}")
+
+def reset_trigger_flag():
+    try:
+        os.environ["RUN_SYNC_TRIGGERED"] = "false"
+        print("[INFO] RUN_SYNC_TRIGGERED flag reset.")
+    except Exception as e:
+        print(f"[WARNING] Failed to reset trigger flag: {e}")
 
 def download_model():
     print("[STEP] Downloading model...")
 
     try:
-        # Check for the existing files in the cache before starting the download
         check_files_in_cache(CACHE_DIR)
-        
-        snapshot_download(
+
+        model_path = snapshot_download(
             repo_id="stabilityai/stable-diffusion-3.5-large",
             cache_dir=CACHE_DIR,
-            local_dir=TARGET_DIR,
-            local_dir_use_symlinks=False,  # Ensure it doesn't use symlinks
             use_auth_token=hf_token
         )
-        print(f"[SUCCESS] Model downloaded to {TARGET_DIR}")
+
+        print(f"[SUCCESS] Model downloaded and available at: {model_path}")
+        reset_trigger_flag()
+
     except OSError as e:
         if "Disk quota exceeded" in str(e):
             print("[ERROR] Disk quota exceeded.")
@@ -74,5 +81,5 @@ def download_model():
 
 # Start process
 print("[START] RUN_SYNC_TRIGGERED is true. Starting script.")
-clean_volume()  # Clean the volume to free space
-download_model()  # Start downloading the model
+clean_volume()  # Clean everything except the cache
+download_model()
