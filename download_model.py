@@ -1,13 +1,11 @@
 import os
 import shutil
-import torch
 from huggingface_hub import hf_hub_download
-from transformers import AutoModel
 import runpod
-import psutil
 
 # Define paths
-cache_dir = "/runpod-volume/huggingface-cache/stable-diffusion-3.5-large"
+volume_dir = "/runpod-volume"
+cache_dir = os.path.join(volume_dir, "huggingface-cache")
 model_name = "stabilityai/stable-diffusion-3.5-large"
 
 # Retrieve the HF_TOKEN environment variable
@@ -22,28 +20,29 @@ def check_disk_space(threshold=0.90):
     print(f"Disk usage: {disk_usage * 100:.2f}%")
     return disk_usage < threshold
 
+# Function to clear the volume directory
+def clear_volume():
+    print("Clearing /runpod-volume directory...")
+    if os.path.exists(volume_dir):
+        shutil.rmtree(volume_dir)
+    os.makedirs(volume_dir)  # Recreate the volume directory
+
 # Function to download the model
 def download_model():
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
+    # Clear everything from /runpod-volume
+    clear_volume()
 
-    # Check if model already exists to prevent redundant download
-    model_path = os.path.join(cache_dir, model_name.split("/")[-1])
-    if os.path.exists(model_path):
-        print(f"Model already exists at {model_path}. Skipping download.")
-        return model_path
-
-    # If space is sufficient, download model
-    if check_disk_space():
-        print("Sufficient space available. Downloading model...")
-        hf_hub_download(repo_id=model_name, token=hf_token, cache_dir=cache_dir)
-        print(f"Model downloaded successfully to {model_path}.")
-        return model_path
-    else:
-        print("Disk quota exceeded. Deleting model and not downloading again.")
-        # Delete all cached files in the cache directory
-        shutil.rmtree(cache_dir)
+    # Check if there is sufficient space before starting the download
+    if not check_disk_space():
+        print("Disk quota exceeded. Not downloading the model.")
         return None
+
+    print("Sufficient space available. Starting download...")
+
+    # Download the model to the cache directory
+    model_path = hf_hub_download(repo_id=model_name, token=hf_token, cache_dir=cache_dir)
+    print(f"Model downloaded successfully to {model_path}.")
+    return model_path
 
 # Run the model download
 download_model()
