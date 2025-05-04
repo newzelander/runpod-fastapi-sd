@@ -16,14 +16,15 @@ os.environ["HF_HOME"] = "/runpod-volume/hf-cache"  # Ensure the cache uses the p
 MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
 TARGET_DIR = "/runpod-volume/stable-diffusion"
 
-# Flag to indicate whether to run the download process
-RUN_SYNC_TRIGGERED = os.environ.get("RUN_SYNC_TRIGGERED", "false") == "true"  # Use this variable to trigger the execution
-
-# Function to simulate waiting for the RunSync trigger
+# Function to wait until RUN_SYNC_TRIGGERED becomes true
 def wait_for_run_sync():
-    while not RUN_SYNC_TRIGGERED:
+    while True:
+        run_sync = os.environ.get("RUN_SYNC_TRIGGERED", "false").lower() == "true"
+        if run_sync:
+            print("[INFO] RunSync trigger detected. Proceeding with model download...")
+            break
         print("[INFO] Waiting for RunSync trigger...")
-        time.sleep(5)  # Sleep and wait for the trigger to be set to true
+        time.sleep(5)
 
 # Disk usage and error handling functions
 def show_disk_usage():
@@ -57,7 +58,7 @@ def download_model():
     print(f"[INFO] Downloading model to {TARGET_DIR} using symlinks to save space...")
 
     try:
-        # Download model files and handle the symlink
+        # Download model files and create symlinks
         hf_hub_download(
             repo_id=MODEL_NAME,
             local_dir=TARGET_DIR,
@@ -76,6 +77,5 @@ def download_model():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    wait_for_run_sync()  # Wait until the RunSync button is pressed and triggered
-
-    download_model()  # Only runs after the trigger is set
+    wait_for_run_sync()  # Wait until the RunSync button is pressed
+    download_model()     # Start downloading the model
