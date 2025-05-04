@@ -66,6 +66,3 @@ def handler(event):
 
     except Exception as e:
         return {"error": str(e)}
-
-# Register handler (this will be automatically triggered when requested)
-handler = RunPodHandler(handler)
