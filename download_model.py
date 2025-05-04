@@ -1,59 +1,46 @@
 import os
 import shutil
+import requests
+import torch
 from huggingface_hub import hf_hub_download
+import subprocess
 
-# Define paths
-volume_dir = "/runpod-volume"
-cache_dir = os.path.join(volume_dir, "huggingface-cache")
-model_name = "stabilityai/stable-diffusion-3.5-large"
-
-# Retrieve the HF_TOKEN environment variable
-hf_token = os.environ.get("HF_TOKEN")
-if not hf_token:
-    raise ValueError("HF_TOKEN environment variable is not set.")
-
-# Function to check disk space
-def check_disk_space(threshold=0.90):
-    total, used, free = shutil.disk_usage(volume_dir)  # Check space only in the persistent volume
-    disk_usage = used / total
-    print(f"Disk usage of persistent volume: {disk_usage * 100:.2f}%")
-    return disk_usage < threshold
-
-# Function to clear the volume directory
-def clear_volume():
-    print("Clearing /runpod-volume directory...")
-    if os.path.exists(volume_dir):
-        shutil.rmtree(volume_dir)
-    os.makedirs(volume_dir)  # Recreate the volume directory
-
-# Function to show disk space usage for the persistent volume
-def show_disk_usage():
-    total, used, free = shutil.disk_usage(volume_dir)  # Use the persistent volume path
-    print(f"Total disk space in persistent volume: {total // (2**30)} GB")
-    print(f"Used disk space in persistent volume: {used // (2**30)} GB")
-    print(f"Free disk space in persistent volume: {free // (2**30)} GB")
-    print(f"Current disk usage of persistent volume: {used / total * 100:.2f}%")
+# Function to get the disk usage of the specific directory
+def get_disk_usage(path):
+    total, used, free = shutil.disk_usage(path)
+    return used / total
 
 # Function to download the model
 def download_model():
-    # Clear everything from /runpod-volume
-    clear_volume()
+    model_name = "stabilityai/stable-diffusion-3.5-large"
+    cache_directory = "/runpod-volume/huggingface-cache/stable-diffusion-3.5-large"
+    hf_token = os.environ.get("HF_TOKEN")
 
-    # Check if there is sufficient space before starting the download
-    if not check_disk_space():
-        print("Disk quota exceeded. Not downloading the model.")
-        return None
+    if not hf_token:
+        raise ValueError("HF_TOKEN environment variable is not set.")
+    
+    print("Starting download...")
+    
+    # Delete everything in the persistent volume before starting the download
+    if os.path.exists(cache_directory):
+        print(f"Deleting previous data in {cache_directory}")
+        shutil.rmtree(cache_directory)
 
-    print("Sufficient space available. Starting download...")
+    os.makedirs(cache_directory, exist_ok=True)
 
-    # Download the model to the cache directory
-    model_path = hf_hub_download(repo_id=model_name, token=hf_token, cache_dir=cache_dir)
-    print(f"Model downloaded successfully to {model_path}.")
+    # Check disk space before downloading
+    disk_usage = get_disk_usage("/runpod-volume")
+    if disk_usage > 0.9:
+        print("Disk space usage exceeds 90%. Aborting download.")
+        return {"error": "Disk space exceeded"}
 
-    # Show disk space after downloading the model
-    show_disk_usage()
+    # Download the model using Hugging Face API
+    print(f"Downloading model: {model_name}")
+    model_path = hf_hub_download(repo_id=model_name, token=hf_token, cache_dir=cache_directory)
 
-    return model_path
+    # Check space after download
+    used_space = get_disk_usage("/runpod-volume") * 100
+    print(f"Download complete. Disk usage: {used_space:.2f}% used.")
 
-# Run the model download
-download_model()
+    return {"model_path": model_path, "disk_usage": used_space}
+
