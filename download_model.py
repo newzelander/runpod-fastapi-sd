@@ -2,6 +2,7 @@ import os
 import shutil
 from huggingface_hub import hf_hub_download
 import traceback
+import time
 
 # Get Hugging Face token securely
 hf_token = os.environ.get("HF_TOKEN")
@@ -15,6 +16,16 @@ os.environ["HF_HOME"] = "/runpod-volume/hf-cache"  # Ensure the cache uses the p
 MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
 TARGET_DIR = "/runpod-volume/stable-diffusion"
 
+# Flag to indicate whether to run the download process
+RUN_SYNC_TRIGGERED = os.environ.get("RUN_SYNC_TRIGGERED", "false") == "true"  # Use this variable to trigger the execution
+
+# Function to simulate waiting for the RunSync trigger
+def wait_for_run_sync():
+    while not RUN_SYNC_TRIGGERED:
+        print("[INFO] Waiting for RunSync trigger...")
+        time.sleep(5)  # Sleep and wait for the trigger to be set to true
+
+# Disk usage and error handling functions
 def show_disk_usage():
     total, used, free = shutil.disk_usage("/runpod-volume")
     print(f"[DISK] Total: {total // (2**20)} MB")
@@ -36,6 +47,7 @@ def handle_quota_error():
 
     print("[INFO] Exiting without retrying download due to quota issue.")
 
+# Model download function
 def download_model():
     if os.path.exists(TARGET_DIR):
         print(f"[INFO] Model already exists at {TARGET_DIR}. Skipping download.")
@@ -64,4 +76,6 @@ def download_model():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    download_model()
+    wait_for_run_sync()  # Wait until the RunSync button is pressed and triggered
+
+    download_model()  # Only runs after the trigger is set
