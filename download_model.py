@@ -1,65 +1,50 @@
 import os
 import shutil
-from huggingface_hub import hf_hub_download
+from huggingface_hub import snapshot_download
 import traceback
-import time
 
-# 1. Set Hugging Face cache to persistent volume
-os.environ["HF_HOME"] = "/runpod-volume/hf-cache"
+# Check trigger
+if os.environ.get("RUN_SYNC_TRIGGERED", "false").lower() != "true":
+    print("[INFO] RUN_SYNC_TRIGGERED is not true. Exiting.")
+    exit(0)
 
-# 2. Get Hugging Face token from env
+# Set Hugging Face token and cache directory
 hf_token = os.environ.get("HF_TOKEN")
 if not hf_token:
     raise ValueError("HF_TOKEN environment variable is not set.")
 
-# 3. Set target directory for model
+os.environ["HF_HOME"] = "/runpod-volume/hf-cache"
+
+# Define model and target path
+MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
 TARGET_DIR = "/runpod-volume/stable-diffusion"
 
-# 4. Wait until RUN_SYNC_TRIGGERED is true
-def wait_for_run_sync():
-    while os.environ.get("RUN_SYNC_TRIGGERED", "false").lower() != "true":
-        print("[INFO] Waiting for RunSync trigger...")
-        time.sleep(5)
-
-# 5. Show disk usage
-def show_disk_usage():
-    total, used, free = shutil.disk_usage("/runpod-volume")
-    print(f"[DISK] Total: {total // (2**20)} MB")
-    print(f"[DISK] Used: {used // (2**20)} MB")
-    print(f"[DISK] Free: {free // (2**20)} MB")
-
-# 6. Clean the target directory
-def clean_target_directory():
-    if os.path.exists(TARGET_DIR):
-        print(f"[INFO] Cleaning target directory: {TARGET_DIR}")
-        shutil.rmtree(TARGET_DIR)
-    os.makedirs(TARGET_DIR, exist_ok=True)
-    print("[INFO] Target directory is clean.")
-
-# 7. Download the model
-def download_model():
-    print(f"[INFO] Downloading model to {TARGET_DIR}...")
+# Clean existing model directory
+if os.path.exists(TARGET_DIR):
+    print(f"[INFO] Cleaning existing directory: {TARGET_DIR}")
     try:
-        hf_hub_download(
-            repo_id="stabilityai/stable-diffusion-3.5-large",
-            local_dir=TARGET_DIR,
-            use_auth_token=hf_token,
-            local_dir_use_symlinks=True
-        )
-        print(f"[SUCCESS] Model downloaded to {TARGET_DIR}")
-    except OSError as e:
-        if "Disk quota exceeded" in str(e):
-            print("[ERROR] Disk quota exceeded.")
-            show_disk_usage()
-        else:
-            print("[ERROR] Unexpected OS error:")
-            traceback.print_exc()
+        shutil.rmtree(TARGET_DIR)
+        print("[INFO] Existing model directory removed.")
     except Exception as e:
-        print("[ERROR] Unexpected exception:")
+        print(f"[ERROR] Failed to clean model directory: {e}")
         traceback.print_exc()
+        exit(1)
 
-# 8. Script entrypoint
-if __name__ == "__main__":
-    wait_for_run_sync()
-    clean_target_directory()
-    download_model()
+# Create fresh target directory
+os.makedirs(TARGET_DIR, exist_ok=True)
+
+# Download model using symlinks to save space
+try:
+    print("[INFO] Downloading model...")
+    snapshot_download(
+        repo_id=MODEL_NAME,
+        cache_dir="/runpod-volume/hf-cache",
+        local_dir=TARGET_DIR,
+        local_dir_use_symlinks=True,
+        token=hf_token
+    )
+    print("[SUCCESS] Model downloaded to:", TARGET_DIR)
+except Exception as e:
+    print("[ERROR] Model download failed:")
+    traceback.print_exc()
+    exit(1)
