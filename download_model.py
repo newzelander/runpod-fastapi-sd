@@ -33,13 +33,10 @@ def show_disk_usage():
     except Exception as e:
         print(f"[ERROR] Failed to check disk usage: {str(e)}")
 
-def check_files_in_cache(directory):
-    total_files = sum([len(files) for r, d, files in os.walk(directory)])
-    print(f"[INFO] Total files in {directory}: {total_files}")
-
 def clean_volume():
     print("[ACTION] Cleaning up /runpod-volume (including hf-cache)...")
     try:
+        # Clean up everything in /runpod-volume, including the hf-cache folder
         for item in os.listdir("/runpod-volume"):
             item_path = os.path.join("/runpod-volume", item)
             if os.path.isfile(item_path) or os.path.islink(item_path):
@@ -61,9 +58,6 @@ def download_model():
     print("[STEP] Downloading model...")
 
     try:
-        # Check if the model already exists in the cache folder
-        check_files_in_cache(CACHE_DIR)
-
         # Check available disk space before downloading (using subprocess for accurate result)
         show_disk_usage()
 
@@ -104,4 +98,6 @@ def download_model():
 # Start process
 print("[START] RUN_SYNC_TRIGGERED is true. Starting script.")
 clean_volume()  # Clean everything before starting
-download_model()  # Download the model
+
+# Perform model download
+download_model()
