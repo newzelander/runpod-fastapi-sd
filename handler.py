@@ -1,80 +1,66 @@
+import runpod
+import logging
 import os
 import shutil
-from huggingface_hub import snapshot_download, login
+from diffusers import DiffusionPipeline
+import torch
+from huggingface_hub import login
 
-# Helper to get disk usage stats for /runpod-volume
-def get_volume_disk_usage(path="/runpod-volume"):
-    total, used, free = shutil.disk_usage(path)
-    return {
-        "total_gb": round(total / (1024 ** 3), 2),
-        "used_gb": round(used / (1024 ** 3), 2),
-        "free_gb": round(free / (1024 ** 3), 2)
-    }
+# Setup detailed logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-# Safely clear the contents of /runpod-volume without removing the mount point
-def clear_runpod_volume():
-    folder = "/runpod-volume"
-    for filename in os.listdir(folder):
-        file_path = os.path.join(folder, filename)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)  # remove file or link
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)  # remove directory
-        except Exception as e:
-            print(f"Failed to delete {file_path}. Reason: {e}")
+# Check Hugging Face token
+hf_token = os.environ.get("HF_TOKEN")
+if hf_token:
+    logger.info("HF_TOKEN is set.")
+    login(hf_token)
+else:
+    logger.warning("HF_TOKEN not found in environment variables.")
 
-def handler(event, context):
-    # Debugging output
-    print(f"Event: {event}")
-    print(f"Context: {context}")
-    
-    # Extract input parameters from the event
-    inputs = event.get("input", {})
-    model_name = inputs.get("model")
-    cache_dir = inputs.get("cache_directory", "/runpod-volume/huggingface-cache")
-    max_disk_usage = float(inputs.get("max_disk_usage", 0.9))
-    check_disk_space = inputs.get("check_disk_space", True)
+# Check disk usage
+total, used, free = shutil.disk_usage("/")
+logger.info(f"Disk usage — Total: {total // (1024**2)}MB | Used: {used // (1024**2)}MB | Free: {free // (1024**2)}MB")
 
-    # Ensure model name is provided in the event
-    if not model_name:
-        return {"error": "Missing 'model' in input."}
+# Global model variable
+pipe = None
 
-    print("Clearing /runpod-volume...")
-    # Clean up the persistent volume
-    clear_runpod_volume()
-
-    # Check disk space before downloading
-    if check_disk_space:
-        usage = shutil.disk_usage("/runpod-volume")
-        if usage.used / usage.total > max_disk_usage:
-            return {"error": "Disk usage exceeds limit before download. Volume has been cleared."}
-
+# Initialization
+def init():
+    global pipe
     try:
-        print("Logging in to Hugging Face...")
-        # Login to Hugging Face with the provided token
-        login(token=os.environ.get("HF_TOKEN"))
-
-        print(f"Downloading model: {model_name}")
-        # Download the model from Hugging Face
-        model_path = snapshot_download(
-            repo_id=model_name,
-            cache_dir=cache_dir,
-            local_files_only=False,
-            resume_download=True
-        )
-
-        # After download, report how much space is used
-        disk_usage = get_volume_disk_usage()
-
-        return {
-            "status": "Download complete",
-            "model_path": model_path,
-            "disk_usage": disk_usage
-        }
-
+        logger.info("Initializing Stable Diffusion 3.5 large model...")
+        pipe = DiffusionPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-3.5-large",
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16"
+        ).to("cuda")
+        logger.info("Model successfully loaded and moved to GPU.")
     except Exception as e:
-        print(f"Error occurred: {str(e)}")
-        # If any exception occurs, return an error message
+        logger.exception("Error during model initialization.")
+
+init()
+
+# Handler
+def handler(job, context):
+    logger.info(f"Received job: {job}")
+    try:
+        input_data = job.get("input", {})
+        prompt = input_data.get("prompt", "A scenic mountain at sunrise")
+        logger.debug(f"Prompt: {prompt}")
+
+        logger.info("Starting inference...")
+        image = pipe(prompt).images[0]
+        output_path = "/tmp/generated_image.png"
+        image.save(output_path)
+        logger.info("Image generation complete.")
+
+        return {"image_path": output_path}
+    except Exception as e:
+        logger.exception("Error during handler execution.")
         return {"error": str(e)}
 
+# Start Runpod serverless worker
+logger.info("Starting Runpod serverless handler...")
+runpod.serverless.start({"handler": handler})
