@@ -1,7 +1,6 @@
 import os
 import shutil
 from huggingface_hub import hf_hub_download
-import runpod
 
 # Define paths
 volume_dir = "/runpod-volume"
@@ -27,6 +26,14 @@ def clear_volume():
         shutil.rmtree(volume_dir)
     os.makedirs(volume_dir)  # Recreate the volume directory
 
+# Function to show disk space usage
+def show_disk_usage():
+    total, used, free = shutil.disk_usage("/")
+    print(f"Total disk space: {total // (2**30)} GB")
+    print(f"Used disk space: {used // (2**30)} GB")
+    print(f"Free disk space: {free // (2**30)} GB")
+    print(f"Current disk usage: {used / total * 100:.2f}%")
+
 # Function to download the model
 def download_model():
     # Clear everything from /runpod-volume
@@ -42,6 +49,10 @@ def download_model():
     # Download the model to the cache directory
     model_path = hf_hub_download(repo_id=model_name, token=hf_token, cache_dir=cache_dir)
     print(f"Model downloaded successfully to {model_path}.")
+
+    # Show disk space after downloading the model
+    show_disk_usage()
+
     return model_path
 
 # Run the model download
