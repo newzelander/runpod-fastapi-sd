@@ -2,6 +2,7 @@ import os
 import shutil
 import logging
 from huggingface_hub import snapshot_download, login
+import runpod
 
 # Set up logging for maximum verbosity
 logging.basicConfig(level=logging.DEBUG)
@@ -95,3 +96,5 @@ def handler(event, context):
         logger.error(f"Error occurred: {str(e)}")
         return {"error": str(e)}
 
+# Ensure the handler is invoked with runpod.serverless.start
+runpod.serverless.start({"handler": handler})
