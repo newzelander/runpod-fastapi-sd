@@ -24,9 +24,10 @@ def clear_runpod_volume():
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
 
+# Handler function that processes the event
 def handler(event, context):
     print("Handler invoked")
-    
+
     # Extract input parameters from the event
     inputs = event.get("input", {})
     model_name = inputs.get("model")
@@ -76,3 +77,17 @@ def handler(event, context):
         # If any exception occurs, return an error message
         return {"error": str(e)}
 
+# Main function to test handler directly
+if __name__ == "__main__":
+    # You can define a test event here for local testing
+    test_event = {
+        "input": {
+            "model": "stabilityai/stable-diffusion-3.5-large",
+            "cache_directory": "/runpod-volume/huggingface-cache",
+            "max_disk_usage": 0.9,
+            "check_disk_space": True
+        }
+    }
+    print("Starting handler...")
+    result = handler(test_event, None)
+    print(f"Handler result: {result}")
