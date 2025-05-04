@@ -16,11 +16,8 @@ os.environ["HF_HOME"] = "/runpod-volume/hf-cache"
 MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
 TARGET_DIR = "/runpod-volume/stable-diffusion"
 
-# Function to simulate waiting for the RunSync trigger
-def wait_for_run_sync():
-    while os.environ.get("RUN_SYNC_TRIGGERED", "false") != "true":
-        print("[INFO] Waiting for RunSync trigger...")
-        time.sleep(5)
+# Wait until this file appears as a RunSync trigger
+TRIGGER_FILE = "/runpod-volume/trigger-sync.txt"
 
 # Disk usage and error handling functions
 def show_disk_usage():
@@ -44,14 +41,26 @@ def handle_quota_error():
 
     print("[INFO] Exiting without retrying download due to quota issue.")
 
-# Model download function
+# Function to wait for a manual trigger (file-based)
+def wait_for_run_sync():
+    print("[INFO] Waiting for RunSync trigger file...")
+    while not os.path.exists(TRIGGER_FILE):
+        time.sleep(5)
+    print("[INFO] RunSync trigger detected. Proceeding with model setup.")
+
+# Check and download model
 def download_model():
-    if os.path.exists(TARGET_DIR) and os.listdir(TARGET_DIR):
-        print(f"[INFO] Model already exists at {TARGET_DIR}. Skipping download.")
+    # Check if required files exist (not just folder)
+    required_files = ["model_index.json"]  # Add more known files if needed
+    model_ready = all(os.path.exists(os.path.join(TARGET_DIR, f)) for f in required_files)
+
+    if model_ready:
+        print(f"[INFO] Required model files found in {TARGET_DIR}. Skipping download.")
         return
 
+    print(f"[INFO] Model files not found. Downloading model to {TARGET_DIR}...")
+
     os.makedirs(TARGET_DIR, exist_ok=True)
-    print(f"[INFO] Downloading model to {TARGET_DIR} using symlinks to save space...")
 
     try:
         hf_hub_download(
