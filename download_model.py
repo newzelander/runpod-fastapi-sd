@@ -2,73 +2,64 @@ import os
 import shutil
 from huggingface_hub import hf_hub_download
 import traceback
+import time
 
-# Get Hugging Face token securely
+# 1. Set Hugging Face cache to persistent volume
+os.environ["HF_HOME"] = "/runpod-volume/hf-cache"
+
+# 2. Get Hugging Face token from env
 hf_token = os.environ.get("HF_TOKEN")
 if not hf_token:
     raise ValueError("HF_TOKEN environment variable is not set.")
 
-# Set Hugging Face cache to persistent directory
-os.environ["HF_HOME"] = "/runpod-volume/hf-cache"  # Ensure the cache uses the persistent volume
-
-# Define paths
-MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
+# 3. Set target directory for model
 TARGET_DIR = "/runpod-volume/stable-diffusion"
 
-# Disk usage and error handling functions
+# 4. Wait until RUN_SYNC_TRIGGERED is true
+def wait_for_run_sync():
+    while os.environ.get("RUN_SYNC_TRIGGERED", "false").lower() != "true":
+        print("[INFO] Waiting for RunSync trigger...")
+        time.sleep(5)
+
+# 5. Show disk usage
 def show_disk_usage():
     total, used, free = shutil.disk_usage("/runpod-volume")
     print(f"[DISK] Total: {total // (2**20)} MB")
     print(f"[DISK] Used: {used // (2**20)} MB")
     print(f"[DISK] Free: {free // (2**20)} MB")
 
-def handle_quota_error():
-    print("[ERROR] Disk quota exceeded.")
-    print("[ACTION] Showing current disk usage:")
-    show_disk_usage()
-
-    print("[ACTION] Cleaning up /runpod-volume to free space...")
-    try:
-        shutil.rmtree("/runpod-volume")
-        os.makedirs("/runpod-volume")
-        print("[SUCCESS] Volume cleaned.")
-    except Exception as cleanup_err:
-        print(f"[FAILURE] Could not clean volume: {cleanup_err}")
-
-    print("[INFO] Exiting without retrying download due to quota issue.")
-
-# Delete existing files in the target directory (free up space before download)
-def delete_existing_files():
+# 6. Clean the target directory
+def clean_target_directory():
     if os.path.exists(TARGET_DIR):
-        print("[INFO] Deleting existing files in the target directory...")
+        print(f"[INFO] Cleaning target directory: {TARGET_DIR}")
         shutil.rmtree(TARGET_DIR)
-        os.makedirs(TARGET_DIR)
-        print(f"[INFO] All files deleted from {TARGET_DIR}.")
-
-# Model download function
-def download_model():
     os.makedirs(TARGET_DIR, exist_ok=True)
-    print(f"[INFO] Downloading model to {TARGET_DIR} using symlinks to save space...")
+    print("[INFO] Target directory is clean.")
 
+# 7. Download the model
+def download_model():
+    print(f"[INFO] Downloading model to {TARGET_DIR}...")
     try:
-        # Download model files and handle the symlink
         hf_hub_download(
-            repo_id=MODEL_NAME,
+            repo_id="stabilityai/stable-diffusion-3.5-large",
             local_dir=TARGET_DIR,
             use_auth_token=hf_token,
             local_dir_use_symlinks=True
         )
-        print(f"[SUCCESS] Model downloaded and symlinked to {TARGET_DIR}")
+        print(f"[SUCCESS] Model downloaded to {TARGET_DIR}")
     except OSError as e:
         if "Disk quota exceeded" in str(e):
-            handle_quota_error()
+            print("[ERROR] Disk quota exceeded.")
+            show_disk_usage()
         else:
             print("[ERROR] Unexpected OS error:")
             traceback.print_exc()
     except Exception as e:
-        print("[ERROR] Unexpected exception occurred:")
+        print("[ERROR] Unexpected exception:")
         traceback.print_exc()
 
+# 8. Script entrypoint
 if __name__ == "__main__":
-    delete_existing_files()  # Delete any existing files before downloading the model
-    download_model()  # Download the model
+    wait_for_run_sync()
+    clean_target_directory()
+    download_model()
