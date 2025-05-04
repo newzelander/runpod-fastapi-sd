@@ -25,8 +25,10 @@ def clear_runpod_volume():
             print(f"Failed to delete {file_path}. Reason: {e}")
 
 def handler(event, context):
-    print("Handler invoked")
-
+    # Debugging output
+    print(f"Event: {event}")
+    print(f"Context: {context}")
+    
     # Extract input parameters from the event
     inputs = event.get("input", {})
     model_name = inputs.get("model")
@@ -76,8 +78,3 @@ def handler(event, context):
         # If any exception occurs, return an error message
         return {"error": str(e)}
 
-# Make sure the handler is started
-import runpod.serverless
-runpod.serverless.start({
-    "handler": handler
-})
