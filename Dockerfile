@@ -1,24 +1,28 @@
 FROM python:3.10-slim
 
-# Set working directory
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /app
 
 # Install necessary system dependencies
-RUN apt-get update && apt-get install -y \
-    libpython3.10-dev \
-    build-essential \
-    git \
-    curl \
-    libatlas-base-dev \
-    libomp-dev
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpython3.10-dev \
+        build-essential \
+        git \
+        curl \
+        libatlas-base-dev \
+        libomp-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy requirements.txt and install Python dependencies
+# Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the handler script and model download script
+# Copy handler script
 COPY handler.py .
-COPY download_model.py .
 
-# Set the command to run the handler script
+# Set the command to run the handler
 CMD ["python", "handler.py"]
