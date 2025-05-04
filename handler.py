@@ -1,69 +1,9 @@
-import os
-import shutil
-import logging
 import subprocess
-import time
-import psutil
-import runpod.serverless
-
-# Initialize logging
-logging.basicConfig(level=logging.INFO)
-
-# Constants for disk usage check
-DISK_PATH = "/runpod-volume"  # The directory to check disk usage for
-MAX_DISK_USAGE = 0.9  # Maximum allowed disk usage (90%)
-
-def check_disk_usage():
-    """Check the disk usage of the persistent volume"""
-    disk_usage = psutil.disk_usage(DISK_PATH)
-    used = disk_usage.used / (1024 * 1024 * 1024)  # Convert bytes to GB
-    total = disk_usage.total / (1024 * 1024 * 1024)  # Convert bytes to GB
-    free = disk_usage.free / (1024 * 1024 * 1024)  # Convert bytes to GB
-    logging.info(f"Disk Usage: {used:.2f}GB used, {free:.2f}GB free, {total:.2f}GB total.")
-    return used, free, total
-
-def download_model(event):
-    """Download the model and handle the event"""
-    # Get model details from the event
-    model_name = event.get("model", "stabilityai/stable-diffusion-3.5-large")
-    logging.info(f"Starting download for model: {model_name}")
-    
-    # Log disk usage before download
-    used_before, free_before, total_before = check_disk_usage()
-
-    # Simulate model download process (you will replace this with the actual download code)
-    # Example: subprocess.run(f"wget {model_name}", shell=True)
-    # We simulate a model download here by sleeping for 5 seconds
-    time.sleep(5)  # Simulate download time
-
-    # Log disk usage after download
-    used_after, free_after, total_after = check_disk_usage()
-
-    # Check if disk space exceeded during download
-    if used_after > MAX_DISK_USAGE * total_after:
-        logging.error("Disk quota exceeded during model download.")
-        return {"status": "failure", "message": "Disk quota exceeded during model download."}
-
-    # Return a success message
-    return {"status": "success", "message": "Model download complete"}
 
 def handler(event):
-    """Main handler function that processes the event"""
-    try:
-        logging.info(f"Received event: {event}")
-        
-        # Ensure event contains the necessary data
-        if not event.get("model"):
-            return {"status": "failure", "message": "Model name missing in event data"}
-        
-        # Call the download model function
-        result = download_model(event)
-
-        return result
-
-    except Exception as e:
-        logging.error(f"Error occurred: {e}")
-        return {"status": "failure", "message": str(e)}
-
-# Start the RunPod serverless worker with the handler function
-runpod.serverless.start({"handler": handler})
+    result = subprocess.run(["python", "preload_model.py"], capture_output=True, text=True)
+    return {
+        "status": "completed",
+        "stdout": result.stdout,
+        "stderr": result.stderr
+    }
