@@ -22,30 +22,21 @@ def remove_all(path):
         print(f"{path} does not exist.")
 
 def get_disk_usage():
-    """Get the disk usage of the persistent volume."""
+    """Accurately get the disk usage of /runpod-volume using du."""
     try:
-        output = subprocess.check_output(['df', '-h', VOLUME_PATH]).decode('utf-8')
-        lines = output.splitlines()
-        # Extract the line containing the disk usage information
-        disk_info = lines[1].split()
-        total = disk_info[1]
-        used = disk_info[2]
-        available = disk_info[3]
+        output = subprocess.check_output(['du', '-sh', VOLUME_PATH]).decode('utf-8')
+        size, _ = output.split("\t")
         return {
-            "total": total,
-            "used": used,
-            "available": available
+            "used_by_runpod_volume": size
         }
     except subprocess.CalledProcessError as e:
         print(f"Error getting disk usage: {e}")
         return None
 
 def cleanup_phase():
-    """Clear all volumes and caches."""
-    # Clean /runpod-volume
+    """Clear /runpod-volume and Hugging Face cache."""
     remove_all(VOLUME_PATH)
 
-    # Clean Hugging Face cache
     hf_cache = os.path.expanduser("~/.cache/huggingface")
     if os.path.exists(hf_cache):
         print("Deleting Hugging Face cache...")
@@ -53,46 +44,21 @@ def cleanup_phase():
 
     print("✅ Cleanup complete.")
 
-def download_phase():
-    """Download model to the clean volume."""
-    # Prevent HF from using internal cache
-    os.environ["HF_HUB_DISABLE_CACHE"] = "1"
-
-    # Download model into /runpod-volume
-    snapshot_download(
-        repo_id="stabilityai/stable-diffusion-3.5-large",
-        local_dir=VOLUME_PATH,
-        local_dir_use_symlinks=False,
-        resume_download=False  # Full clean download
-    )
-
-    print("✅ Model download complete.")
-
 def run_cleanup(job):
     input_data = job["input"]
     if input_data.get("action") == "clean":
-        # Get disk usage before cleanup
-        disk_usage_before_cleanup = get_disk_usage()
+        usage_before = get_disk_usage()
 
         cleanup_phase()
 
-        # Get disk usage after cleanup
-        disk_usage_after_cleanup = get_disk_usage()
-
-        # Run the model download phase
-        download_phase()
-
-        # Get disk usage after download
-        disk_usage_after_download = get_disk_usage()
+        usage_after = get_disk_usage()
 
         return {
             "status": "success",
-            "disk_usage_before_cleanup": disk_usage_before_cleanup,
-            "disk_usage_after_cleanup": disk_usage_after_cleanup,
-            "disk_usage_after_download": disk_usage_after_download
+            "disk_usage_before_cleanup": usage_before,
+            "disk_usage_after_cleanup": usage_after
         }
     else:
         return {"status": "skipped", "reason": "No valid action provided."}
 
-# Register the function with RunPod
 runpod.serverless.start({"handler": run_cleanup})
