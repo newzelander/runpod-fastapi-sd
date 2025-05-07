@@ -1,6 +1,6 @@
 import os
 import shutil
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, list_repo_files
 import runpod
 
 VOLUME_PATH = "/runpod-volume"
@@ -39,29 +39,25 @@ def download_phase():
     # Prevent HF from using internal cache
     os.environ["HF_HUB_DISABLE_CACHE"] = "1"
 
-    # Define the model repository and files to download
+    # Define the model repository
     repo_id = "stabilityai/stable-diffusion-3.5-large"
-    files = [
-        "model_index.json",
-        "vae/config.json",
-        "vae/diffusion_pytorch_model.bin",
-        "unet/config.json",
-        "unet/diffusion_pytorch_model.bin",
-        "text_encoder/config.json",
-        "text_encoder/model.safetensors",
-        "tokenizer/tokenizer.json",
-        "scheduler/scheduler_config.json"
-    ]
-
+    
+    # List all available files in the repository
+    repo_files = list_repo_files(repo_id)
+    
     # Download each file
-    for filename in files:
-        hf_hub_download(
-            repo_id=repo_id,
-            filename=filename,
-            local_dir=VOLUME_PATH,
-            force_download=True
-        )
-
+    for filename in repo_files:
+        try:
+            hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                local_dir=VOLUME_PATH,
+                force_download=True
+            )
+            print(f"✅ Downloaded: {filename}")
+        except Exception as e:
+            print(f"❌ Failed to download {filename}: {e}")
+    
     print("✅ Model download complete.")
 
 def run_cleanup(job):
