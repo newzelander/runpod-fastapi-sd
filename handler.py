@@ -27,6 +27,15 @@ def check_disk_space(required_gb=15):
     print(f"Free space: {free_gb:.2f} GB")
     return free_gb > required_gb
 
+def get_directory_size(directory):
+    """Calculate the total size of the directory (including all subdirectories)."""
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(directory):
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            total_size += os.path.getsize(file_path)
+    return total_size
+
 def download_model():
     """Download the model from Hugging Face if it's not already cached."""
     if HF_TOKEN:
@@ -42,16 +51,15 @@ def download_model():
     model_size = get_directory_size(MODEL_DIR)
     print(f"Model downloaded. The size of the model is approximately {model_size / (2**30):.2f} GB")
     
-    return model_path
-
-def get_directory_size(directory):
-    """Calculate the total size of the directory (including all subdirectories)."""
-    total_size = 0
-    for dirpath, dirnames, filenames in os.walk(directory):
+    # Show where the model is cached
+    print(f"Model is cached at: {MODEL_DIR}")
+    print("Directories where model is saved:")
+    for dirpath, dirnames, filenames in os.walk(MODEL_DIR):
+        print(f"Found directory: {dirpath}")
         for filename in filenames:
-            file_path = os.path.join(dirpath, filename)
-            total_size += os.path.getsize(file_path)
-    return total_size
+            print(f"  File: {os.path.join(dirpath, filename)}")
+    
+    return model_path
 
 def preload():
     """Ensure the model is preloaded into memory, checking if it already exists in cache."""
