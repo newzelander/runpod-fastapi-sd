@@ -1,10 +1,12 @@
 import os
 import shutil
-from huggingface_hub import hf_hub_download, list_repo_files
+from huggingface_hub import list_repo_files, hf_hub_download
 import runpod
 
+# Path for the volume where the model files will be stored
 VOLUME_PATH = "/runpod-volume"
 
+# Function to delete all files and directories in a given path
 def remove_all(path):
     """Recursively delete all files and directories in the given path."""
     if os.path.exists(path):
@@ -21,6 +23,7 @@ def remove_all(path):
     else:
         print(f"{path} does not exist.")
 
+# Function to clear out the volume and Hugging Face cache
 def cleanup_phase():
     """Clear all volumes and caches."""
     # Clean /runpod-volume
@@ -34,40 +37,41 @@ def cleanup_phase():
 
     print("✅ Cleanup complete.")
 
-def download_phase():
+# Function to dynamically download all files from Hugging Face repository
+def download_model():
     """Download model to the clean volume."""
-    # Prevent HF from using internal cache
+    # Prevent Hugging Face from using internal cache
     os.environ["HF_HUB_DISABLE_CACHE"] = "1"
 
-    # Define the model repository
+    # Define the model repository ID
     repo_id = "stabilityai/stable-diffusion-3.5-large"
     
-    # List all available files in the repository
-    repo_files = list_repo_files(repo_id)
-    
-    # Download each file
-    for filename in repo_files:
-        try:
-            hf_hub_download(
-                repo_id=repo_id,
-                filename=filename,
-                local_dir=VOLUME_PATH,
-                force_download=True
-            )
-            print(f"✅ Downloaded: {filename}")
-        except Exception as e:
-            print(f"❌ Failed to download {filename}: {e}")
-    
+    # List all files in the model repository
+    files = list_repo_files(repo_id)
+
+    # Download each file from the repository
+    for file in files:
+        print(f"Downloading: {file}")
+        hf_hub_download(
+            repo_id=repo_id,
+            filename=file,
+            local_dir=VOLUME_PATH,
+            force_download=True
+        )
+
     print("✅ Model download complete.")
 
-def run_cleanup(job):
-    input_data = job["input"]
+# Main handler function for RunPod serverless
+def handler(job):
+    input_data = job.get("input", {})
+    
+    # Check if the action is 'clean', then perform cleanup and download
     if input_data.get("action") == "clean":
         cleanup_phase()
-        download_phase()
+        download_model()
         return {"status": "success"}
     else:
         return {"status": "skipped", "reason": "No valid action provided."}
 
-# Register the function with RunPod
-runpod.serverless.start({"handler": run_cleanup})
+# Register the handler function with RunPod
+runpod.serverless.start({"handler": handler})
