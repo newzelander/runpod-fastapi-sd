@@ -6,11 +6,8 @@ WORKDIR /app
 # Copy the necessary files into the container
 COPY . /app
 
-# Install dependencies
+# Install dependencies from requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Set environment variable to disable Hugging Face cache
-ENV HF_HUB_DISABLE_CACHE=1
 
 # Expose the port for the application
 EXPOSE 8080
