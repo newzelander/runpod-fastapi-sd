@@ -1,12 +1,11 @@
 import os
 import shutil
-from huggingface_hub import list_repo_files, hf_hub_download
+from diffusers import StableDiffusion3Pipeline  # Corrected pipeline import
 import runpod
 
-# Path for the volume where the model files will be stored
 VOLUME_PATH = "/runpod-volume"
+HF_CACHE_DIR = VOLUME_PATH  # Set cache directory to the volume
 
-# Function to delete all files and directories in a given path
 def remove_all(path):
     """Recursively delete all files and directories in the given path."""
     if os.path.exists(path):
@@ -23,7 +22,6 @@ def remove_all(path):
     else:
         print(f"{path} does not exist.")
 
-# Function to clear out the volume and Hugging Face cache
 def cleanup_phase():
     """Clear all volumes and caches."""
     # Clean /runpod-volume
@@ -37,39 +35,27 @@ def cleanup_phase():
 
     print("✅ Cleanup complete.")
 
-# Function to dynamically download all files from Hugging Face repository
 def download_model():
-    """Download model to the clean volume."""
+    """Download and load the model using from_pretrained."""
     # Prevent Hugging Face from using internal cache
     os.environ["HF_HUB_DISABLE_CACHE"] = "1"
-
-    # Define the model repository ID
-    repo_id = "stabilityai/stable-diffusion-3.5-large"
     
-    # List all files in the model repository
-    files = list_repo_files(repo_id)
+    # Explicitly set the cache directory to avoid temporary files
+    print(f"Downloading model to {HF_CACHE_DIR}")
+    
+    repo_id = "stabilityai/stable-diffusion-3.5-large"
+    pipe = StableDiffusion3Pipeline.from_pretrained(repo_id, cache_dir=HF_CACHE_DIR)
+    
+    print("✅ Model download and load complete.")
+    return pipe
 
-    # Download each file from the repository
-    for file in files:
-        print(f"Downloading: {file}")
-        hf_hub_download(
-            repo_id=repo_id,
-            filename=file,
-            local_dir=VOLUME_PATH,
-            force_download=True
-        )
-
-    print("✅ Model download complete.")
-
-# Main handler function for RunPod serverless
 def handler(job):
     input_data = job.get("input", {})
     
-    # Check if the action is 'clean', then perform cleanup and download
     if input_data.get("action") == "clean":
         cleanup_phase()
-        download_model()
-        return {"status": "success"}
+        pipe = download_model()  # This will download and load the model
+        return {"status": "success", "message": "Model downloaded and loaded."}
     else:
         return {"status": "skipped", "reason": "No valid action provided."}
 
