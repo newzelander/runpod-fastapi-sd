@@ -4,70 +4,61 @@ import subprocess
 from huggingface_hub import snapshot_download
 import runpod
 
-# Show existing folders and paths
-def show_existing_paths():
-    print("\n📁 Existing folders and paths:")
-    paths_to_check = [
-        "/runpod-volume",
-        os.path.expanduser("~/.cache/huggingface/hub")
-    ]
-    for path in paths_to_check:
-        print(f"✅ Found: {path}" if os.path.exists(path) else f"❌ Not found: {path}")
+# ----------------------------- #
+# ✅ Set Hugging Face cache path
+# ----------------------------- #
+os.environ["HF_HOME"] = "/runpod-volume"
+os.environ["HF_HUB_CACHE"] = "/runpod-volume"
+os.environ["TRANSFORMERS_CACHE"] = "/runpod-volume"  # optional, good practice
 
-# Clear directory contents
-def clear_directory_contents():
-    print("\n🧹 Clearing directory contents...")
-    paths_to_clear = [
-        "/runpod-volume",
-        os.path.expanduser("~/.cache/huggingface/hub")
-    ]
-    for path in paths_to_clear:
-        if os.path.exists(path):
-            for item in os.listdir(path):
-                item_path = os.path.join(path, item)
-                try:
-                    if os.path.isdir(item_path):
-                        shutil.rmtree(item_path)
-                    else:
-                        os.remove(item_path)
-                except Exception as e:
-                    print(f"⚠️ Failed to delete {item_path}: {e}")
-            print(f"✅ Cleared: {path}")
-        else:
-            print(f"ℹ️ Path does not exist: {path}")
+# ----------------------------- #
+# 🧹 Clean old Hugging Face cache (if exists)
+# ----------------------------- #
+def clean_default_huggingface_cache():
+    default_path = "/root/.cache/huggingface"
+    if os.path.exists(default_path):
+        print(f"🧹 Removing default Hugging Face cache at {default_path}...")
+        shutil.rmtree(default_path, ignore_errors=True)
+        print("✅ Removed.")
 
-# Show all files and directories in the given path
-def list_files_in_directory(path):
-    print(f"\n📂 Listing all files and directories in {path}:")
-    for root, dirs, files in os.walk(path):
-        for name in files:
-            print(f"File: {os.path.join(root, name)}")
-        for name in dirs:
-            print(f"Directory: {os.path.join(root, name)}")
+# ----------------------------- #
+# 📁 Show folder structure
+# ----------------------------- #
+def show_directory_tree(path, prefix=""):
+    if not os.path.exists(path):
+        print(f"❌ Path does not exist: {path}")
+        return
+    for item in os.listdir(path):
+        item_path = os.path.join(path, item)
+        print(f"{prefix}📁 {item}" if os.path.isdir(item_path) else f"{prefix}📄 {item}")
+        if os.path.isdir(item_path):
+            show_directory_tree(item_path, prefix + "    ")
 
-# Set Hugging Face cache location
-def configure_hugging_face_cache():
-    print("\n⚙️ Configuring Hugging Face cache...")
-    os.environ["HF_HUB_CACHE"] = "/runpod-volume"
+# ----------------------------- #
+# 📊 Show disk usage for /runpod-volume
+# ----------------------------- #
+def show_disk_usage():
+    try:
+        output = subprocess.check_output(['du', '-sh', '/runpod-volume']).decode('utf-8')
+        size = output.split()[0]
+        print(f"\n💾 Disk usage: {size}B on /runpod-volume")
+    except Exception as e:
+        print(f"❌ Error checking disk usage: {e}")
 
-# Show available disk space on /runpod-volume
-def show_available_disk_space():
-    statvfs = os.statvfs("/runpod-volume")
-    free_bytes = statvfs.f_frsize * statvfs.f_bavail
-    free_gb = free_bytes / (1024 ** 3)
-    print(f"\n🧮 Available disk space: {free_gb:.2f} GB on /runpod-volume")
-
-# Load the model
+# ----------------------------- #
+# 🚀 Preload model
+# ----------------------------- #
 def preload_model():
-    print("\n🚀 Preloading model...")
+    print("\n🚀 Starting model download...")
 
     model_dir = "/runpod-volume"
+    model_index_path = os.path.join(model_dir, "model_index.json")
 
-    if not os.path.exists(os.path.join(model_dir, "model_index.json")):
+    if not os.path.exists(model_index_path):
         print("📦 Model not found locally. Downloading...")
         try:
             snapshot_download(
-                repo_id="stabilityai/stable-diffusion-3.5-large",  # Correct model path
+                repo_id="stabilityai/stable-diffusion-3.5-large",
                 local_dir=model_dir,
                 local_dir_use_symlinks=False
             )
@@ -77,23 +68,27 @@ def preload_model():
     else:
         print("📁 Model already exists at:", model_dir)
 
-    show_available_disk_space()
-    list_files_in_directory(model_dir)  # Show all files and directories
+    # Show results
+    show_disk_usage()
+    print("\n📂 Directory structure in /runpod-volume:")
+    show_directory_tree("/runpod-volume")
 
-    return {"status": "success", "message": "Model downloaded."}
+    return {"status": "success", "message": "Model is available on /runpod-volume."}
 
-# RunPod handler
+# ----------------------------- #
+# 🔧 RunPod handler
+# ----------------------------- #
 def handler(event):
     print("\n📥 Received event:", event)
     action = event.get("input", {}).get("action", "")
 
     if action == "preload_model":
-        show_existing_paths()
-        clear_directory_contents()
-        configure_hugging_face_cache()
+        clean_default_huggingface_cache()
         return preload_model()
     else:
         return {"status": "error", "message": f"Unknown action: {action}"}
 
-# Start RunPod serverless job handler
+# ----------------------------- #
+# 🔌 Start RunPod serverless job
+# ----------------------------- #
 runpod.serverless.start({"handler": handler})
