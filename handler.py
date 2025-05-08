@@ -1,5 +1,8 @@
 import os
 import shutil
+import torch
+from huggingface_hub import snapshot_download, login
+from diffusers import StableDiffusion3Pipeline
 
 # Function to show all existing folders/paths including ~/.cache/huggingface/hub
 def show_existing_paths():
@@ -48,6 +51,22 @@ def configure_hugging_face_cache():
     # Optionally, you can disable the default cache altogether
     # os.environ["HF_HUB_DISABLE_CACHE"] = "1"  # Uncomment to disable the default Hugging Face cache
 
+# Function to preload and load the model
+def preload():
+    # Set the model directory based on cache or runpod-volume
+    model_dir = "/runpod-volume"  # or specify your own model path
+
+    # Load model into memory
+    pipe = StableDiffusion3Pipeline.from_pretrained(
+        model_dir,
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        use_safetensors=True
+    )
+    
+    # Move model to the appropriate device (GPU if available, otherwise CPU)
+    pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    return pipe
+
 # Main function to run the operations
 def main():
     # Show existing paths
@@ -63,12 +82,20 @@ def main():
         configure_hugging_face_cache()
         print("Hugging Face cache configuration applied. No duplicate downloads will occur.")
         
-        # You may want to trigger any other process after clearing the directories, if necessary.
+        # Preload the model after clearing and configuring cache
+        pipe = preload()
+        print("Model loaded into memory successfully.")
         
-        print("Cleanup and configuration complete.")
+        # You can now use `pipe` for further processing.
+        print("Model pipeline is ready for use.")
     else:
         print("Operation aborted.")
 
-# Run the script
-if __name__ == "__main__":
-    main()
+# Initialize Hugging Face model download and processing
+def download_model(model_name):
+    model_path = snapshot_download(repo_id=model_name, cache_dir=os.getenv("HF_HUB_CACHE", "/runpod-volume"))
+    print(f"Model downloaded to {model_path}")
+    
+    # Example model pipeline setup and loading
+    pipe = StableDiffusion3Pipeline.from_pretrained(model_path, torch_dtype=torch.float16)
+    print
