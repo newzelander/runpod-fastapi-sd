@@ -27,12 +27,24 @@ def clean_default_huggingface_cache():
 def clean_runpod_volume():
     runpod_volume_path = "/runpod-volume"
     if os.path.exists(runpod_volume_path):
-        print(f"🧹 Deleting everything in {runpod_volume_path}...")
-        shutil.rmtree(runpod_volume_path)
-        os.makedirs(runpod_volume_path)  # Recreate the directory
-        print(f"✅ Deleted everything in {runpod_volume_path} and recreated the directory.")
+        try:
+            print(f"🧹 Deleting everything in {runpod_volume_path}...")
+            shutil.rmtree(runpod_volume_path)
+            os.makedirs(runpod_volume_path)  # Recreate the directory
+            print(f"✅ Deleted everything in {runpod_volume_path} and recreated the directory.")
+        except Exception as e:
+            print(f"❌ Error during cleaning: {e}")
     else:
         print(f"❌ {runpod_volume_path} does not exist.")
+
+# ----------------------------- #
+# 📁 Check directory permissions
+# ----------------------------- #
+def check_directory_permissions(path):
+    if os.access(path, os.W_OK):
+        print(f"✅ {path} is writable.")
+    else:
+        print(f"❌ {path} is not writable or accessible.")
 
 # ----------------------------- #
 # 📁 Show folder structure
@@ -64,7 +76,6 @@ def show_disk_usage():
 def preload_model():
     print("\n🚀 Starting selective model file download...")
 
-    repo_id = "stabilityai/stable-diffusion-3.5-large"
     model_dir = "/runpod-volume/stabilityai/stable-diffusion-3.5-large"  # Updated path
 
     # Create the model directory if it doesn't exist
@@ -90,14 +101,20 @@ def preload_model():
         # Clean /runpod-volume before starting the download
         clean_runpod_volume()
 
+        # Check permissions before starting the download
+        check_directory_permissions("/runpod-volume")
+        check_directory_permissions(model_dir)
+
         for file in files_to_download:
             print(f"⬇️  Downloading: {file}")
             hf_hub_download(
-                repo_id=repo_id,
+                repo_id="stabilityai/stable-diffusion-3.5-large",
                 filename=file,
                 local_dir=model_dir,
                 local_dir_use_symlinks=False
             )
+            print(f"✅ Successfully downloaded: {file}")
+
         print("✅ All required files downloaded.")
     except Exception as e:
         return {"status": "error", "message": f"Download failed: {e}"}
