@@ -7,35 +7,24 @@ import runpod
 # ----------------------------- #
 # ✅ Set Hugging Face cache path
 # ----------------------------- #
-os.environ["HF_HOME"] = "/runpod-volume"
-os.environ["HF_HUB_CACHE"] = "/runpod-volume"
-os.environ["TRANSFORMERS_CACHE"] = "/runpod-volume"  # optional, good practice
+os.environ["HF_HOME"] = "/runpod-volume/huggingface_cache"
+os.environ["HF_HUB_CACHE"] = "/runpod-volume/huggingface_cache"
+os.environ["TRANSFORMERS_CACHE"] = "/runpod-volume/huggingface_cache"  # optional, good practice
 
 # ----------------------------- #
-# 🧹 Clean old Hugging Face cache (if exists)
-# ----------------------------- #
-def clean_default_huggingface_cache():
-    default_path = "/root/.cache/huggingface"
-    if os.path.exists(default_path):
-        print(f"🧹 Removing default Hugging Face cache at {default_path}...")
-        shutil.rmtree(default_path, ignore_errors=True)
-        print("✅ Removed.")
-
-# ----------------------------- #
-# 🧹 Delete everything in /runpod-volume
+# 🧹 Clean entire /runpod-volume/
 # ----------------------------- #
 def clean_runpod_volume():
-    runpod_volume_path = "/runpod-volume"
-    if os.path.exists(runpod_volume_path):
+    if os.path.exists("/runpod-volume"):
         try:
-            print(f"🧹 Deleting everything in {runpod_volume_path}...")
-            shutil.rmtree(runpod_volume_path)
-            os.makedirs(runpod_volume_path)  # Recreate the directory
-            print(f"✅ Deleted everything in {runpod_volume_path} and recreated the directory.")
+            print("🧹 Cleaning everything inside /runpod-volume...")
+            shutil.rmtree("/runpod-volume")
+            os.makedirs("/runpod-volume")  # Recreate the base directory
+            print("✅ Cleaned /runpod-volume and recreated it.")
         except Exception as e:
             print(f"❌ Error during cleaning: {e}")
     else:
-        print(f"❌ {runpod_volume_path} does not exist.")
+        print("❌ /runpod-volume does not exist.")
 
 # ----------------------------- #
 # 📁 Check directory permissions
@@ -47,7 +36,7 @@ def check_directory_permissions(path):
         print(f"❌ {path} is not writable or accessible.")
 
 # ----------------------------- #
-# 📁 Show folder structure
+# 📂 Show folder structure
 # ----------------------------- #
 def show_directory_tree(path, prefix=""):
     if not os.path.exists(path):
@@ -76,7 +65,7 @@ def show_disk_usage():
 def preload_model():
     print("\n🚀 Starting selective model file download...")
 
-    model_dir = "/runpod-volume/stabilityai/stable-diffusion-3.5-large"  # Updated path
+    model_dir = "/runpod-volume/stabilityai/stable-diffusion-3.5-large"
 
     # Create the model directory if it doesn't exist
     if not os.path.exists(model_dir):
@@ -98,22 +87,26 @@ def preload_model():
     ]
 
     try:
-        # Clean /runpod-volume before starting the download
+        # Clean the entire /runpod-volume/
         clean_runpod_volume()
 
         # Check permissions before starting the download
         check_directory_permissions("/runpod-volume")
         check_directory_permissions(model_dir)
 
+        # Download files
         for file in files_to_download:
             print(f"⬇️  Downloading: {file}")
-            hf_hub_download(
-                repo_id="stabilityai/stable-diffusion-3.5-large",
-                filename=file,
-                local_dir=model_dir,
-                local_dir_use_symlinks=False
-            )
-            print(f"✅ Successfully downloaded: {file}")
+            try:
+                hf_hub_download(
+                    repo_id="stabilityai/stable-diffusion-3.5-large",
+                    filename=file,
+                    local_dir=model_dir,
+                    local_dir_use_symlinks=False
+                )
+                print(f"✅ Successfully downloaded: {file}")
+            except Exception as e:
+                print(f"❌ Failed to download {file}: {e}")
 
         print("✅ All required files downloaded.")
     except Exception as e:
@@ -133,7 +126,6 @@ def handler(event):
     action = event.get("input", {}).get("action", "")
 
     if action == "preload_model":
-        clean_default_huggingface_cache()
         return preload_model()
     else:
         return {"status": "error", "message": f"Unknown action: {action}"}
