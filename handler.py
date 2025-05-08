@@ -59,7 +59,7 @@ def preload_model():
         print("📦 Model not found locally. Downloading...")
         try:
             snapshot_download(
-                repo_id="stabilityai/stable-diffusion-3",
+                repo_id="stabilityai/stable-diffusion-3.5-large",  # Correct model path
                 local_dir=model_dir,
                 local_dir_use_symlinks=False
             )
