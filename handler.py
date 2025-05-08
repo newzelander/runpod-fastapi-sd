@@ -14,7 +14,7 @@ def show_existing_paths():
     for path in paths_to_check:
         print(f"✅ Found: {path}" if os.path.exists(path) else f"❌ Not found: {path}")
 
-# Clear directory contents (optional)
+# Clear directory contents
 def clear_directory_contents():
     print("\n🧹 Clearing directory contents...")
     paths_to_clear = [
@@ -36,6 +36,15 @@ def clear_directory_contents():
         else:
             print(f"ℹ️ Path does not exist: {path}")
 
+# Show all files and directories in the given path
+def list_files_in_directory(path):
+    print(f"\n📂 Listing all files and directories in {path}:")
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            print(f"File: {os.path.join(root, name)}")
+        for name in dirs:
+            print(f"Directory: {os.path.join(root, name)}")
+
 # Set Hugging Face cache location
 def configure_hugging_face_cache():
     print("\n⚙️ Configuring Hugging Face cache...")
@@ -48,8 +57,10 @@ def show_available_disk_space():
     free_gb = free_bytes / (1024 ** 3)
     print(f"\n🧮 Available disk space: {free_gb:.2f} GB on /runpod-volume")
 
-# Download the model if not present locally
-def download_model():
+# Load the model
+def preload_model():
+    print("\n🚀 Preloading model...")
+
     model_dir = "/runpod-volume"
 
     if not os.path.exists(os.path.join(model_dir, "model_index.json")):
@@ -67,8 +78,9 @@ def download_model():
         print("📁 Model already exists at:", model_dir)
 
     show_available_disk_space()
+    list_files_in_directory(model_dir)  # Show all files and directories
 
-    return {"status": "success", "message": "Model download complete."}
+    return {"status": "success", "message": "Model downloaded."}
 
 # RunPod handler
 def handler(event):
@@ -77,9 +89,9 @@ def handler(event):
 
     if action == "preload_model":
         show_existing_paths()
-        clear_directory_contents()  # Optional
+        clear_directory_contents()
         configure_hugging_face_cache()
-        return download_model()
+        return preload_model()
     else:
         return {"status": "error", "message": f"Unknown action: {action}"}
 
