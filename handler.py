@@ -1,9 +1,8 @@
 import os
 import shutil
 import torch
-import json
-from huggingface_hub import snapshot_download, login
 from diffusers import StableDiffusion3Pipeline
+import runpod.serverless
 
 # Function to show all existing folders/paths including ~/.cache/huggingface/hub
 def show_existing_paths():
@@ -50,9 +49,6 @@ def configure_hugging_face_cache():
     print("Configuring Hugging Face cache to /runpod-volume...")
     # Set the Hugging Face cache directory to the runpod-volume directory
     os.environ["HF_HUB_CACHE"] = "/runpod-volume"  # Use runpod-volume as the cache directory
-    
-    # Optionally, you can disable the default cache altogether
-    # os.environ["HF_HUB_DISABLE_CACHE"] = "1"  # Uncomment to disable the default Hugging Face cache
 
 # Function to preload and load the model
 def preload():
@@ -90,21 +86,18 @@ def process_input(json_input):
     else:
         print(f"Unknown action: {action}")
 
-# Main function to run the operations
-def main():
+# Main function to be triggered by RunPod
+def main(event, context):
     print("Starting the main function...")
 
-    # Here we simulate receiving the input JSON (in reality, you will pass this as input to the script)
-    json_input = {
-        "id": "job-id-003",
-        "input": {
-            "action": "preload_model"
-        }
-    }
+    # Assuming event is the input JSON passed by RunPod
+    json_input = event  # RunPod passes this as the event
 
     # Process the input JSON
     process_input(json_input)
 
-# Ensure the script runs when triggered by RunPod UI
+    return {"status": "completed"}
+
+# Initialize the serverless execution with RunPod
 if __name__ == "__main__":
-    main()
+    runpod.serverless.start(main)
