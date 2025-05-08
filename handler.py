@@ -12,15 +12,9 @@ CUSTOM_CACHE_DIR = os.path.join(PERSISTENT_VOLUME_DIR, "my-model-cache")
 HF_TOKEN = os.getenv("HF_TOKEN")  # Set in RunPod environment variables
 MODEL_DIR = os.path.join(CUSTOM_CACHE_DIR, MODEL_NAME.replace("/", "_"))
 
-# --- Optional: Clear default Hugging Face cache (uncomment if needed) ---
-# default_hf_cache = os.path.expanduser("~/.cache/huggingface")
-# if os.path.exists(default_hf_cache):
-#     print(f"Clearing default Hugging Face cache at {default_hf_cache}...")
-#     shutil.rmtree(default_hf_cache)
-
 # --- Persistent Volume Management ---
 def clear_persistent_volume():
-    """Clear all files in persistent volume to ensure there is enough space."""
+    """Clear all files in persistent volume."""
     print("Clearing persistent volume...")
     for item in os.listdir(PERSISTENT_VOLUME_DIR):
         item_path = os.path.join(PERSISTENT_VOLUME_DIR, item)
@@ -31,13 +25,6 @@ def clear_persistent_volume():
                 os.remove(item_path)
         except Exception as e:
             print(f"Error removing {item_path}: {e}")
-
-def check_disk_space(required_gb=15):
-    """Check if there is enough free disk space on the persistent volume."""
-    total, used, free = shutil.disk_usage(PERSISTENT_VOLUME_DIR)
-    free_gb = free / (2**30)
-    print(f"Free space in /runpod-volume: {free_gb:.2f} GB")
-    return free_gb > required_gb
 
 def get_directory_size(directory):
     """Calculate the total size of the directory (including all subdirectories)."""
@@ -82,14 +69,10 @@ def download_model():
     return model_path
 
 def preload():
-    """Ensure model is downloaded and loaded into memory."""
-    if not os.path.exists(MODEL_DIR):
-        if not check_disk_space():
-            clear_persistent_volume()
-        download_model()
-    else:
-        print("✅ Model already cached.")
-    
+    """Always clear volume, then download and load the model."""
+    clear_persistent_volume()  # Always clear first
+    download_model()           # Always download fresh
+
     # Load model into memory
     pipe = StableDiffusion3Pipeline.from_pretrained(
         MODEL_DIR,
