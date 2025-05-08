@@ -1,7 +1,7 @@
 import os
 import shutil
 import subprocess
-from huggingface_hub import snapshot_download
+from huggingface_hub import hf_hub_download
 import runpod
 
 # ----------------------------- #
@@ -20,6 +20,19 @@ def clean_default_huggingface_cache():
         print(f"🧹 Removing default Hugging Face cache at {default_path}...")
         shutil.rmtree(default_path, ignore_errors=True)
         print("✅ Removed.")
+
+# ----------------------------- #
+# 🧹 Delete everything in /runpod-volume
+# ----------------------------- #
+def clean_runpod_volume():
+    runpod_volume_path = "/runpod-volume"
+    if os.path.exists(runpod_volume_path):
+        print(f"🧹 Deleting everything in {runpod_volume_path}...")
+        shutil.rmtree(runpod_volume_path)
+        os.makedirs(runpod_volume_path)  # Recreate the directory
+        print(f"✅ Deleted everything in {runpod_volume_path} and recreated the directory.")
+    else:
+        print(f"❌ {runpod_volume_path} does not exist.")
 
 # ----------------------------- #
 # 📁 Show folder structure
@@ -46,34 +59,54 @@ def show_disk_usage():
         print(f"❌ Error checking disk usage: {e}")
 
 # ----------------------------- #
-# 🚀 Preload model
+# 🚀 Preload model with minimal files
 # ----------------------------- #
 def preload_model():
-    print("\n🚀 Starting model download...")
+    print("\n🚀 Starting selective model file download...")
 
-    model_dir = "/runpod-volume"
-    model_index_path = os.path.join(model_dir, "model_index.json")
+    repo_id = "stabilityai/stable-diffusion-3.5-large"
+    model_dir = "/runpod-volume/stabilityai/stable-diffusion-3.5-large"  # Updated path
 
-    if not os.path.exists(model_index_path):
-        print("📦 Model not found locally. Downloading...")
-        try:
-            snapshot_download(
-                repo_id="stabilityai/stable-diffusion-3.5-large",
+    # Create the model directory if it doesn't exist
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+        print(f"📂 Created model directory at {model_dir}")
+
+    files_to_download = [
+        "model_index.json",
+        "config.json",
+        "scheduler/scheduler_config.json",
+        "tokenizer/merges.txt",
+        "tokenizer/vocab.json",
+        "tokenizer/tokenizer.json",
+        "text_encoder/config.json",
+        "text_encoder/model.safetensors",
+        "unet/diffusion_pytorch_model.safetensors",
+        "vae/config.json",
+        "vae/diffusion_pytorch_model.safetensors"
+    ]
+
+    try:
+        # Clean /runpod-volume before starting the download
+        clean_runpod_volume()
+
+        for file in files_to_download:
+            print(f"⬇️  Downloading: {file}")
+            hf_hub_download(
+                repo_id=repo_id,
+                filename=file,
                 local_dir=model_dir,
                 local_dir_use_symlinks=False
             )
-            print("✅ Model downloaded to:", model_dir)
-        except Exception as e:
-            return {"status": "error", "message": f"Download failed: {e}"}
-    else:
-        print("📁 Model already exists at:", model_dir)
+        print("✅ All required files downloaded.")
+    except Exception as e:
+        return {"status": "error", "message": f"Download failed: {e}"}
 
-    # Show results
     show_disk_usage()
-    print("\n📂 Directory structure in /runpod-volume:")
-    show_directory_tree("/runpod-volume")
+    print("\n📂 Directory structure in /runpod-volume/stabilityai/stable-diffusion-3.5-large:")
+    show_directory_tree(model_dir)
 
-    return {"status": "success", "message": "Model is available on /runpod-volume."}
+    return {"status": "success", "message": "Model is available with minimal files."}
 
 # ----------------------------- #
 # 🔧 RunPod handler
