@@ -1,14 +1,16 @@
 import os
 import shutil
 import subprocess
-from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import EntryNotFoundError
+from huggingface_hub import snapshot_download
 import runpod
 
 # Set Hugging Face cache location
 os.environ["HF_HOME"] = "/runpod-volume/huggingface_cache"
 os.environ["HF_HUB_CACHE"] = "/runpod-volume/huggingface_cache"
 os.environ["TRANSFORMERS_CACHE"] = "/runpod-volume/huggingface_cache"
+
+# Use Hugging Face token from environment (set in RunPod secrets)
+HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 def clean_runpod_volume_contents():
     base_path = "/runpod-volume"
@@ -49,7 +51,7 @@ def show_disk_usage():
         print(f"❌ Error checking disk usage: {e}")
 
 def preload_model():
-    print("\n🚀 Starting selective model file download...")
+    print("\n🚀 Starting full model repo download...")
     model_dir = "/runpod-volume/stabilityai/stable-diffusion-3.5-large"
     repo_id = "stabilityai/stable-diffusion-3.5-large"
 
@@ -63,41 +65,21 @@ def preload_model():
         check_directory_permissions("/runpod-volume")
         check_directory_permissions(model_dir)
 
-        # Only download essential files (no git LFS overhead)
-        files_to_download = [
-            "model_index.json",
-            "config.json",
-            "scheduler/scheduler_config.json",
-            "tokenizer/merges.txt",
-            "tokenizer/vocab.json",
-            "tokenizer/tokenizer.json",
-            "text_encoder/config.json",
-            "text_encoder/model.safetensors",   # ~1.2GB
-            "unet/diffusion_pytorch_model.safetensors",  # ~2.7GB
-            "vae/config.json",
-            "vae/diffusion_pytorch_model.safetensors"    # ~335MB
-        ]
-
-        for file in files_to_download:
-            print(f"⬇️  Downloading: {file}")
-            try:
-                hf_hub_download(
-                    repo_id=repo_id,
-                    filename=file,
-                    local_dir=model_dir,
-                    local_dir_use_symlinks=False
-                )
-                print(f"✅ Successfully downloaded: {file}")
-            except EntryNotFoundError:
-                print(f"❌ File not found on HuggingFace: {file}")
-            except Exception as e:
-                print(f"❌ Failed to download {file}: {e}")
+        # Download all files
+        print(f"⬇️  Downloading full repo from: {repo_id}")
+        snapshot_download(
+            repo_id=repo_id,
+            local_dir=model_dir,
+            local_dir_use_symlinks=False,
+            token=HF_TOKEN
+        )
+        print("✅ Full model repo downloaded.")
 
         show_disk_usage()
         print("\n📂 Directory structure:")
         show_directory_tree(model_dir)
 
-        return {"status": "success", "message": "Essential model files downloaded."}
+        return {"status": "success", "message": "Full model repo downloaded."}
 
     except Exception as e:
         return {"status": "error", "message": f"Download failed: {e}"}
