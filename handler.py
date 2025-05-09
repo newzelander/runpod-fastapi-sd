@@ -48,6 +48,14 @@ def show_disk_usage():
     except Exception as e:
         print(f"❌ Error checking disk usage: {e}")
 
+def run_git_lfs_pull(model_dir):
+    print("🚀 Starting `git lfs pull` to fetch all model weights...")
+    try:
+        subprocess.check_call(['git', 'lfs', 'pull'], cwd=model_dir)
+        print("✅ Successfully completed `git lfs pull`.")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed to run `git lfs pull`: {e}")
+
 def preload_model():
     print("\n🚀 Starting selective model file download...")
     model_dir = "/runpod-volume/stabilityai/stable-diffusion-3.5-large"
@@ -65,7 +73,6 @@ def preload_model():
 
         files_to_download = [
             "model_index.json",
-            # Consider commenting this if it's 404-ing
             "config.json",
             "scheduler/scheduler_config.json",
             "tokenizer/merges.txt",
@@ -93,11 +100,14 @@ def preload_model():
             except Exception as e:
                 print(f"❌ Failed to download {file}: {e}")
 
+        # After downloading essential files, perform git lfs pull to get all model weights
+        run_git_lfs_pull(model_dir)
+
         show_disk_usage()
         print("\n📂 Directory structure:")
         show_directory_tree(model_dir)
 
-        return {"status": "success", "message": "Model is available with minimal files."}
+        return {"status": "success", "message": "Model is available with all necessary files."}
 
     except Exception as e:
         return {"status": "error", "message": f"Download failed: {e}"}
