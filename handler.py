@@ -1,11 +1,11 @@
 import os
 import shutil
 import subprocess
-from huggingface_hub import hf_hub_download, login
+from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import EntryNotFoundError
 import runpod
 
-# Set cache
+# Set Hugging Face cache location
 os.environ["HF_HOME"] = "/runpod-volume/huggingface_cache"
 os.environ["HF_HUB_CACHE"] = "/runpod-volume/huggingface_cache"
 os.environ["TRANSFORMERS_CACHE"] = "/runpod-volume/huggingface_cache"
@@ -48,14 +48,6 @@ def show_disk_usage():
     except Exception as e:
         print(f"❌ Error checking disk usage: {e}")
 
-def run_git_lfs_pull(model_dir):
-    print("🚀 Starting `git lfs pull` to fetch all model weights...")
-    try:
-        subprocess.check_call(['git', 'lfs', 'pull'], cwd=model_dir)
-        print("✅ Successfully completed `git lfs pull`.")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to run `git lfs pull`: {e}")
-
 def preload_model():
     print("\n🚀 Starting selective model file download...")
     model_dir = "/runpod-volume/stabilityai/stable-diffusion-3.5-large"
@@ -71,6 +63,7 @@ def preload_model():
         check_directory_permissions("/runpod-volume")
         check_directory_permissions(model_dir)
 
+        # Only download essential files (no git LFS overhead)
         files_to_download = [
             "model_index.json",
             "config.json",
@@ -79,10 +72,10 @@ def preload_model():
             "tokenizer/vocab.json",
             "tokenizer/tokenizer.json",
             "text_encoder/config.json",
-            "text_encoder/model.safetensors",
-            "unet/diffusion_pytorch_model.safetensors",
+            "text_encoder/model.safetensors",   # ~1.2GB
+            "unet/diffusion_pytorch_model.safetensors",  # ~2.7GB
             "vae/config.json",
-            "vae/diffusion_pytorch_model.safetensors"
+            "vae/diffusion_pytorch_model.safetensors"    # ~335MB
         ]
 
         for file in files_to_download:
@@ -100,14 +93,11 @@ def preload_model():
             except Exception as e:
                 print(f"❌ Failed to download {file}: {e}")
 
-        # After downloading essential files, perform git lfs pull to get all model weights
-        run_git_lfs_pull(model_dir)
-
         show_disk_usage()
         print("\n📂 Directory structure:")
         show_directory_tree(model_dir)
 
-        return {"status": "success", "message": "Model is available with all necessary files."}
+        return {"status": "success", "message": "Essential model files downloaded."}
 
     except Exception as e:
         return {"status": "error", "message": f"Download failed: {e}"}
