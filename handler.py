@@ -4,12 +4,15 @@ from diffusers import StableDiffusion3Pipeline
 import torch
 import runpod
 
+# Persistent paths
 VOLUME_PATH = "/runpod-volume"
-HF_CACHE_DIR = os.path.join(VOLUME_PATH, "cache")
 MODEL_DIR = os.path.join(VOLUME_PATH, "models")
+CACHE_DIR = os.path.join(VOLUME_PATH, "cache")
 MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
 MODEL_PATH = os.path.join(MODEL_DIR, "stable-diffusion-3.5-large")
 
+# ✅ Redirect Hugging Face cache to persistent volume
+os.environ["HF_HOME"] = CACHE_DIR
 
 def remove_all(path):
     """Recursively delete all files and directories in the given path."""
@@ -27,52 +30,21 @@ def remove_all(path):
     else:
         print(f"{path} does not exist.")
 
-
 def cleanup_phase():
-    """Clear all volumes and caches."""
+    """Clear model and cache folders."""
     remove_all(VOLUME_PATH)
 
-    # Also clear default Hugging Face user cache just in case
-    hf_cache = os.path.expanduser("~/.cache/huggingface")
-    if os.path.exists(hf_cache):
-        print("Deleting Hugging Face cache...")
-        shutil.rmtree(hf_cache)
+    # Extra safety: clear Hugging Face user-level cache too
+    hf_user_cache = os.path.expanduser("~/.cache/huggingface")
+    if os.path.exists(hf_user_cache):
+        print("Deleting Hugging Face user cache...")
+        shutil.rmtree(hf_user_cache)
 
     print("✅ Cleanup complete.")
 
-
-def download_model():
-    """Download and load the model using from_pretrained."""
-    print(f"Downloading model to: {MODEL_PATH}")
-    print(f"Using cache directory: {HF_CACHE_DIR}")
-
-    os.environ["HF_HOME"] = HF_CACHE_DIR
-    os.makedirs(HF_CACHE_DIR, exist_ok=True)
-    os.makedirs(MODEL_PATH, exist_ok=True)
-
-    try:
-        pipe = StableDiffusion3Pipeline.from_pretrained(
-            pretrained_model_name_or_path=MODEL_NAME,
-            cache_dir=HF_CACHE_DIR,
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            resume_download=True,
-        ).to("cuda")
-
-        print("✅ Model download and load complete.")
-
-        list_files_and_size(MODEL_PATH)
-        list_cache_size(HF_CACHE_DIR)
-
-        return pipe
-    except Exception as e:
-        print(f"❌ Error downloading model: {e}")
-        return None
-
-
-def list_files_and_size(path):
+def list_files_and_size(path, title=""):
     total_size = 0
-    print("\nListing files and directories in model path:")
+    print(f"\n📁 Listing files in {title or path}:")
     for root, dirs, files in os.walk(path):
         level = root.replace(path, '').count(os.sep)
         indent = ' ' * 4 * level
@@ -85,19 +57,41 @@ def list_files_and_size(path):
             print(f"{indent}    {f} - {file_size / (1024 * 1024):.2f} MB")
         total_size += subtotal
         if subtotal > 0:
-            print(f"{indent}    Total size of this folder: {subtotal / (1024 * 1024):.2f} MB")
-    print(f"\nTotal size of model files: {total_size / (1024 * 1024):.2f} MB\n")
+            print(f"{indent}    Folder size: {subtotal / (1024 * 1024):.2f} MB")
+    print(f"\n📦 Total size in {title or path}: {total_size / (1024 * 1024):.2f} MB\n")
 
+def download_model():
+    """Download model only into MODEL_PATH using custom cache."""
+    print(f"Preparing model directory: {MODEL_PATH}")
+    os.makedirs(MODEL_PATH, exist_ok=True)
+    os.makedirs(CACHE_DIR, exist_ok=True)
 
-def list_cache_size(path):
-    total_size = 0
-    print("\nCalculating size of cache directory:")
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            file_path = os.path.join(root, f)
-            total_size += os.path.getsize(file_path)
-    print(f"Total size of cache directory: {total_size / (1024 * 1024):.2f} MB\n")
+    if os.path.exists(os.path.join(MODEL_PATH, "model_index.json")):
+        print("✅ Model already exists in MODEL_PATH.")
+    else:
+        print("⬇️ Downloading model directly into MODEL_PATH...")
+        pipe = StableDiffusion3Pipeline.from_pretrained(
+            pretrained_model_name_or_path=MODEL_NAME,
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            resume_download=True,
+            cache_dir=CACHE_DIR
+        )
+        pipe.save_pretrained(MODEL_PATH)
+        print("✅ Model downloaded and saved to MODEL_PATH.")
 
+    pipe = StableDiffusion3Pipeline.from_pretrained(
+        pretrained_model_name_or_path=MODEL_PATH,
+        torch_dtype=torch.float16,
+        use_safetensors=True
+    ).to("cuda")
+
+    print("✅ Model loaded onto GPU from MODEL_PATH.")
+
+    list_files_and_size(MODEL_PATH, "MODEL_PATH")
+    list_files_and_size(CACHE_DIR, "CACHE_DIR")
+
+    return pipe
 
 def handler(job):
     input_data = job.get("input", {})
@@ -105,12 +99,11 @@ def handler(job):
         cleanup_phase()
         pipe = download_model()
         if pipe:
-            return {"status": "success", "message": "Model downloaded and loaded."}
+            return {"status": "success", "message": "Model downloaded, loaded, and cache inspected."}
         else:
             return {"status": "error", "message": "Model download failed."}
     else:
         return {"status": "skipped", "reason": "No valid action provided."}
 
-
-# Register handler with RunPod
+# Register with RunPod
 runpod.serverless.start({"handler": handler})
