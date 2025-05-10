@@ -4,7 +4,7 @@ from diffusers import StableDiffusion3Pipeline
 import torch
 import runpod
 
-# Persistent paths
+# Paths
 VOLUME_PATH = "/runpod-volume"
 MODEL_DIR = os.path.join(VOLUME_PATH, "models")
 CACHE_DIR = os.path.join(VOLUME_PATH, "cache")
@@ -27,37 +27,22 @@ def remove_all(path):
             except Exception as e:
                 print(f"Error deleting {item_path}: {e}")
 
-def get_dir_size(path):
-    """Get the total size of a directory in bytes."""
-    total_size = 0
-    for dirpath, dirnames, filenames in os.walk(path):
-        for filename in filenames:
-            file_path = os.path.join(dirpath, filename)
-            total_size += os.path.getsize(file_path)
-    return total_size
-
-def list_directory_contents(path):
-    """List all files and directories in a given path."""
-    if os.path.exists(path):
-        print(f"\nContents of {path}:")
-        for root, dirs, files in os.walk(path):
-            for name in dirs:
-                print(f"Directory: {os.path.join(root, name)}")
-            for name in files:
-                print(f"File: {os.path.join(root, name)}")
-
-def preserve_directory_structure(src_dir, dest_dir):
-    """Move model files to destination, preserving subfolder structure."""
+def flatten_and_move_files(src_dir, dest_dir):
+    """Flatten the directory structure but preserve subfolder contents."""
     for root, dirs, files in os.walk(src_dir):
+        # Define the folder relative to the src_dir
+        relative_folder = os.path.relpath(root, src_dir)
+        
         for file in files:
-            file_path = os.path.join(root, file)
-            # Get the relative path inside the source directory
-            relative_path = os.path.relpath(file_path, src_dir)
-            dest_path = os.path.join(dest_dir, relative_path)
+            # Calculate the destination path considering relative folder structure
+            dest_folder = os.path.join(dest_dir, relative_folder)
+            os.makedirs(dest_folder, exist_ok=True)  # Create subfolders as needed
+            src_file = os.path.join(root, file)
+            dest_file = os.path.join(dest_folder, file)
             
-            # Create the subdirectory if it doesn't exist
-            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            shutil.move(file_path, dest_path)  # Move the file to the destination folder
+            # Move the file
+            shutil.move(src_file, dest_file)
+            print(f"Moved {src_file} to {dest_file}")
 
 def download_model():
     """Download the model directly into cache, then move to model path."""
@@ -78,10 +63,10 @@ def download_model():
                 cache_dir=CACHE_DIR  # Download model into the cache folder
             )
             
-            # Preserve the folder structure and move the files to the model path
-            print(f"✅ Preserving folder structure and moving files from {CACHE_DIR} to {MODEL_PATH}...")
-            preserve_directory_structure(CACHE_DIR, MODEL_PATH)
-            print("✅ Model files moved to model path.")
+            # Move the downloaded model to the model path
+            print(f"✅ Moving model from {CACHE_DIR} to {MODEL_PATH}...")
+            flatten_and_move_files(CACHE_DIR, MODEL_PATH)
+            print("✅ Model moved to model path.")
 
             # Optionally clean the cache after moving
             remove_all(CACHE_DIR)
