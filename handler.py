@@ -28,21 +28,46 @@ def remove_all(path):
                 print(f"Error deleting {item_path}: {e}")
 
 def flatten_and_move_files(src_dir, dest_dir):
-    """Flatten the directory structure but preserve subfolder contents."""
-    for root, dirs, files in os.walk(src_dir):
-        # Define the folder relative to the src_dir
-        relative_folder = os.path.relpath(root, src_dir)
-        
+    """Find the true model directory (inside models--*), and move its contents directly."""
+    # Find the top-level folder that starts with 'models--'
+    candidates = [d for d in os.listdir(src_dir) if d.startswith("models--")]
+    if not candidates:
+        print("❌ No model directory found in cache.")
+        return
+
+    model_cache_dir = os.path.join(src_dir, candidates[0])  # Use the first match
+    print(f"📁 Found model cache folder: {model_cache_dir}")
+
+    for root, dirs, files in os.walk(model_cache_dir):
+        relative_folder = os.path.relpath(root, model_cache_dir)
+        dest_folder = os.path.join(dest_dir, relative_folder)
+        os.makedirs(dest_folder, exist_ok=True)
+
         for file in files:
-            # Calculate the destination path considering relative folder structure
-            dest_folder = os.path.join(dest_dir, relative_folder)
-            os.makedirs(dest_folder, exist_ok=True)  # Create subfolders as needed
             src_file = os.path.join(root, file)
             dest_file = os.path.join(dest_folder, file)
-            
-            # Move the file
             shutil.move(src_file, dest_file)
-            print(f"Moved {src_file} to {dest_file}")
+            print(f"✅ Moved {src_file} to {dest_file}")
+
+def get_dir_size(path):
+    """Calculate total size of directory in bytes."""
+    total = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            total += os.path.getsize(fp)
+    return total
+
+def list_directory_contents(path):
+    """Print directory tree."""
+    print(f"\n📂 Contents of {path}:")
+    for root, dirs, files in os.walk(path):
+        level = root.replace(path, "").count(os.sep)
+        indent = " " * (4 * level)
+        print(f"{indent}{os.path.basename(root)}/")
+        sub_indent = " " * (4 * (level + 1))
+        for f in files:
+            print(f"{sub_indent}{f}")
 
 def download_model():
     """Download the model directly into cache, then move to model path."""
@@ -51,45 +76,41 @@ def download_model():
 
     if os.path.exists(os.path.join(MODEL_PATH, "model_index.json")):
         print("✅ Model already exists.")
+        return StableDiffusion3Pipeline.from_pretrained(MODEL_PATH, torch_dtype=torch.float16)
     else:
         try:
             print("⬇️ Downloading model to cache folder...")
-            # Download the model into the cache directory
             pipe = StableDiffusion3Pipeline.from_pretrained(
                 pretrained_model_name_or_path=MODEL_NAME,
                 torch_dtype=torch.float16,
                 use_safetensors=True,
                 variant="fp16",
-                cache_dir=CACHE_DIR  # Download model into the cache folder
+                cache_dir=CACHE_DIR
             )
-            
-            # Move the downloaded model to the model path
-            print(f"✅ Moving model from {CACHE_DIR} to {MODEL_PATH}...")
-            flatten_and_move_files(CACHE_DIR, MODEL_PATH)
-            print("✅ Model moved to model path.")
 
-            # Optionally clean the cache after moving
+            print(f"✅ Moving model from cache to model path: {MODEL_PATH}...")
+            flatten_and_move_files(CACHE_DIR, MODEL_PATH)
+            print("✅ Model moved.")
+
             remove_all(CACHE_DIR)
-            print("✅ Cache cleaned.")
+            print("🧹 Cache cleaned.")
+
+            return pipe
 
         except Exception as e:
             print(f"❌ Error during model download and move: {e}")
             return None
 
-    return pipe
-
 def display_storage_info():
     """Display the contents and sizes of the model and cache directories."""
     print("\n### Directory Information ###")
-    
-    # Display contents and sizes of directories
     list_directory_contents(MODEL_PATH)
     model_size = get_dir_size(MODEL_PATH)
-    print(f"\nTotal size of {MODEL_PATH}: {model_size / (1024 * 1024):.2f} MB")
+    print(f"\n📦 Total size of {MODEL_PATH}: {model_size / (1024 * 1024):.2f} MB")
 
     list_directory_contents(CACHE_DIR)
     cache_size = get_dir_size(CACHE_DIR)
-    print(f"\nTotal size of {CACHE_DIR}: {cache_size / (1024 * 1024):.2f} MB")
+    print(f"\n🧊 Total size of {CACHE_DIR}: {cache_size / (1024 * 1024):.2f} MB")
 
 def handler(job):
     input_data = job.get("input", {})
