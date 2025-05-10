@@ -28,31 +28,47 @@ def remove_all(path):
                 print(f"Error deleting {item_path}: {e}")
 
 def flatten_and_move_files(src_dir, dest_dir):
-    """Find the true model directory (inside models--*), and move its contents directly."""
-    # Find the top-level folder that starts with 'models--'
-    candidates = [d for d in os.listdir(src_dir) if d.startswith("models--")]
-    if not candidates:
-        print("❌ No model directory found in cache.")
+    """
+    Navigate through Hugging Face's nested cache structure and move all model files
+    directly into the destination directory (without nested directories).
+    """
+    model_cache_dirs = [
+        os.path.join(src_dir, d)
+        for d in os.listdir(src_dir)
+        if d.startswith("models--") and os.path.isdir(os.path.join(src_dir, d))
+    ]
+
+    if not model_cache_dirs:
+        print("❌ No model cache directory found.")
         return
 
-    model_cache_dir = os.path.join(src_dir, candidates[0])  # Use the first match
-    print(f"📁 Found model cache folder: {model_cache_dir}")
+    model_cache_dir = model_cache_dirs[0]  # First match is assumed correct
+    snapshot_root = os.path.join(model_cache_dir, "snapshots")
 
-    for root, dirs, files in os.walk(model_cache_dir):
-        relative_folder = os.path.relpath(root, model_cache_dir)
-        dest_folder = os.path.join(dest_dir, relative_folder)
-        os.makedirs(dest_folder, exist_ok=True)
+    if not os.path.exists(snapshot_root):
+        print("❌ No snapshot directory found inside model cache.")
+        return
 
+    snapshot_subdirs = os.listdir(snapshot_root)
+    if not snapshot_subdirs:
+        print("❌ No snapshot subdirectories found.")
+        return
+
+    snapshot_path = os.path.join(snapshot_root, snapshot_subdirs[0])
+    print(f"📁 Using snapshot path: {snapshot_path}")
+
+    # Move all files directly into the destination directory (MODEL_PATH)
+    for root, _, files in os.walk(snapshot_path):
         for file in files:
             src_file = os.path.join(root, file)
-            dest_file = os.path.join(dest_folder, file)
+            dest_file = os.path.join(dest_dir, file)  # Flatten the directory structure
             shutil.move(src_file, dest_file)
             print(f"✅ Moved {src_file} to {dest_file}")
 
 def get_dir_size(path):
     """Calculate total size of directory in bytes."""
     total = 0
-    for dirpath, dirnames, filenames in os.walk(path):
+    for dirpath, _, filenames in os.walk(path):
         for f in filenames:
             fp = os.path.join(dirpath, f)
             total += os.path.getsize(fp)
@@ -70,7 +86,7 @@ def list_directory_contents(path):
             print(f"{sub_indent}{f}")
 
 def download_model():
-    """Download the model directly into cache, then move to model path."""
+    """Download the model into cache, flatten structure, and move to model path."""
     os.makedirs(MODEL_PATH, exist_ok=True)
     os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -134,5 +150,5 @@ def handler(job):
         print("❌ No valid action provided. Skipping.")
         return {"status": "skipped", "reason": "No valid action provided."}
 
-# RunPod serverless start
+# Start RunPod serverless handler
 runpod.serverless.start({"handler": handler})
