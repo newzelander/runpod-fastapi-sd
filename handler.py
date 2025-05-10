@@ -5,6 +5,7 @@ import os
 import runpod
 import uuid
 import time
+import base64  # <-- added for image preview
 
 # Path to the snapshot folder where model files are located
 SNAPSHOT_PATH = "/runpod-volume/models/stable-diffusion-3.5-large/cache/models--stabilityai--stable-diffusion-3.5-large/snapshots/ceddf0a7fdf2064ea28e2213e3b84e4afa170a0f"
@@ -101,6 +102,10 @@ def handler(job):
     image.save(image_path)
     print(f"🖼️ Image saved to: {image_path}")
 
+    # Read and encode the image as base64 to preview it in RunPod UI
+    with open(image_path, "rb") as img_file:
+        image_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+
     # Create a link assuming volume is publicly exposed
     public_url = f"https://{job['id']}-output.runpod.io/{file_name}"
 
@@ -108,7 +113,8 @@ def handler(job):
         "status": "success",
         "prompt": prompt,
         "image_path": image_path,
-        "url": public_url
+        "url": public_url,
+        "image_base64": image_base64  # 👈 RunPod will show this directly as a preview
     }
 
 # Start serverless handler
