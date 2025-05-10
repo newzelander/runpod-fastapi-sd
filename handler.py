@@ -67,7 +67,8 @@ def download_model():
             
             # Move the downloaded model to the model path
             print(f"✅ Moving model from {CACHE_DIR} to {MODEL_PATH}...")
-            shutil.move(CACHE_DIR, MODEL_PATH)
+            # If the structure of the cache directory has specific subdirectories, move them individually
+            shutil.move(os.path.join(CACHE_DIR, 'models--stabilityai--stable-diffusion-3.5-large'), MODEL_PATH)
             print("✅ Model moved to model path.")
 
             # Optionally clean the cache after moving
