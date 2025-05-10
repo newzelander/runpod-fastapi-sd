@@ -27,74 +27,92 @@ def remove_all(path):
             except Exception as e:
                 print(f"Error deleting {item_path}: {e}")
 
-def cleanup_phase():
-    """Clear model and cache folders."""
-    remove_all(VOLUME_PATH)
-
-    # Extra: clear Hugging Face user cache too
-    hf_user_cache = os.path.expanduser("~/.cache/huggingface")
-    if os.path.exists(hf_user_cache):
-        shutil.rmtree(hf_user_cache)
-
-    print("✅ Cleanup complete.")
-
-def list_files_and_size(path, title=""):
+def get_dir_size(path):
+    """Get the total size of a directory in bytes."""
     total_size = 0
-    print(f"\n📁 Listing files in {title or path}:")
-    for root, dirs, files in os.walk(path):
-        indent = ' ' * 4 * (root.replace(path, '').count(os.sep))
-        subtotal = 0
-        for f in files:
-            file_path = os.path.join(root, f)
-            file_size = os.path.getsize(file_path)
-            subtotal += file_size
-        total_size += subtotal
-        if subtotal > 0:
-            print(f"{indent}{os.path.basename(root)}/ - {subtotal / (1024 * 1024):.2f} MB")
-    print(f"📦 Total: {total_size / (1024 * 1024):.2f} MB\n")
+    for dirpath, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            total_size += os.path.getsize(file_path)
+    return total_size
+
+def list_directory_contents(path):
+    """List all files and directories in a given path."""
+    if os.path.exists(path):
+        print(f"\nContents of {path}:")
+        for root, dirs, files in os.walk(path):
+            for name in dirs:
+                print(f"Directory: {os.path.join(root, name)}")
+            for name in files:
+                print(f"File: {os.path.join(root, name)}")
 
 def download_model():
-    """Download the model directly in fp16 and load to GPU."""
+    """Download the model directly into cache, then move to model path."""
     os.makedirs(MODEL_PATH, exist_ok=True)
     os.makedirs(CACHE_DIR, exist_ok=True)
 
     if os.path.exists(os.path.join(MODEL_PATH, "model_index.json")):
         print("✅ Model already exists.")
     else:
-        print("⬇️ Downloading model in 16-bit precision...")
-        pipe = StableDiffusion3Pipeline.from_pretrained(
-            pretrained_model_name_or_path=MODEL_NAME,
-            torch_dtype=torch.float16,
-            use_safetensors=True,
-            variant="fp16",  # 🔥 Critical to avoid downloading 32-bit
-            cache_dir=CACHE_DIR
-        )
-        pipe.save_pretrained(MODEL_PATH)
-        print("✅ Model downloaded and saved.")
+        try:
+            print("⬇️ Downloading model to cache folder...")
+            # Download the model into the cache directory
+            pipe = StableDiffusion3Pipeline.from_pretrained(
+                pretrained_model_name_or_path=MODEL_NAME,
+                torch_dtype=torch.float16,
+                use_safetensors=True,
+                variant="fp16",
+                cache_dir=CACHE_DIR  # Download model into the cache folder
+            )
+            
+            # Move the downloaded model to the model path
+            print(f"✅ Moving model from {CACHE_DIR} to {MODEL_PATH}...")
+            shutil.move(CACHE_DIR, MODEL_PATH)
+            print("✅ Model moved to model path.")
 
-    # Load from local path to GPU
-    pipe = StableDiffusion3Pipeline.from_pretrained(
-        pretrained_model_name_or_path=MODEL_PATH,
-        torch_dtype=torch.float16,
-        use_safetensors=True,
-    ).to("cuda")
+            # Optionally clean the cache after moving
+            remove_all(CACHE_DIR)
+            print("✅ Cache cleaned.")
 
-    print("✅ Model loaded on GPU.")
-    list_files_and_size(MODEL_PATH, "MODEL_PATH")
-    list_files_and_size(CACHE_DIR, "CACHE_DIR")
+        except Exception as e:
+            print(f"❌ Error during model download and move: {e}")
+            return None
 
     return pipe
+
+def display_storage_info():
+    """Display the contents and sizes of the model and cache directories."""
+    print("\n### Directory Information ###")
+    
+    # Display contents and sizes of directories
+    list_directory_contents(MODEL_PATH)
+    model_size = get_dir_size(MODEL_PATH)
+    print(f"\nTotal size of {MODEL_PATH}: {model_size / (1024 * 1024):.2f} MB")
+
+    list_directory_contents(CACHE_DIR)
+    cache_size = get_dir_size(CACHE_DIR)
+    print(f"\nTotal size of {CACHE_DIR}: {cache_size / (1024 * 1024):.2f} MB")
 
 def handler(job):
     input_data = job.get("input", {})
     if input_data.get("action") == "clean":
-        cleanup_phase()
+        print("💻 Cleaning model and cache folders...")
+        remove_all(MODEL_PATH)
         pipe = download_model()
-        return {
-            "status": "success",
-            "message": "Cleaned, model downloaded and loaded." if pipe else "Failed to load model."
-        }
+
+        if pipe is not None:
+            display_storage_info()
+            return {
+                "status": "success",
+                "message": "Model downloaded and moved to model path."
+            }
+        else:
+            return {
+                "status": "failure",
+                "message": "An error occurred during the model download process."
+            }
     else:
+        print("❌ No valid action provided. Skipping.")
         return {"status": "skipped", "reason": "No valid action provided."}
 
 # RunPod serverless start
