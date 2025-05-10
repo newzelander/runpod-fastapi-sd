@@ -46,6 +46,19 @@ def list_directory_contents(path):
             for name in files:
                 print(f"File: {os.path.join(root, name)}")
 
+def preserve_directory_structure(src_dir, dest_dir):
+    """Move model files to destination, preserving subfolder structure."""
+    for root, dirs, files in os.walk(src_dir):
+        for file in files:
+            file_path = os.path.join(root, file)
+            # Get the relative path inside the source directory
+            relative_path = os.path.relpath(file_path, src_dir)
+            dest_path = os.path.join(dest_dir, relative_path)
+            
+            # Create the subdirectory if it doesn't exist
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            shutil.move(file_path, dest_path)  # Move the file to the destination folder
+
 def download_model():
     """Download the model directly into cache, then move to model path."""
     os.makedirs(MODEL_PATH, exist_ok=True)
@@ -65,11 +78,10 @@ def download_model():
                 cache_dir=CACHE_DIR  # Download model into the cache folder
             )
             
-            # Move the downloaded model to the model path
-            print(f"✅ Moving model from {CACHE_DIR} to {MODEL_PATH}...")
-            # If the structure of the cache directory has specific subdirectories, move them individually
-            shutil.move(os.path.join(CACHE_DIR, 'models--stabilityai--stable-diffusion-3.5-large'), MODEL_PATH)
-            print("✅ Model moved to model path.")
+            # Preserve the folder structure and move the files to the model path
+            print(f"✅ Preserving folder structure and moving files from {CACHE_DIR} to {MODEL_PATH}...")
+            preserve_directory_structure(CACHE_DIR, MODEL_PATH)
+            print("✅ Model files moved to model path.")
 
             # Optionally clean the cache after moving
             remove_all(CACHE_DIR)
