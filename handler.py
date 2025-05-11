@@ -12,7 +12,8 @@ if not HF_TOKEN:
 else:
     print("🔑 HF_TOKEN successfully loaded from environment.")
 
-MODEL_ID = "stabilityai/stable-diffusion-3.5-large"
+# Update the model to use the turbo version
+MODEL_ID = "stabilityai/stable-diffusion-3.5-large-turbo"
 
 try:
     client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
