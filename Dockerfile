@@ -3,16 +3,17 @@ FROM python:3.9-slim
 # Set working directory
 WORKDIR /app
 
-# Copy the necessary files into the container
+# Install system-level dependencies
+RUN apt-get update && apt-get install -y libgl1 libglib2.0-0
+
+# Copy project files
 COPY . /app
 
-# Install dependencies from requirements.txt
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install OpenVINO and related dependencies for optimum
+# Install Optimum with OpenVINO backend
 RUN pip install --no-cache-dir "optimum[openvino]" --upgrade
 
-
-
-# Run the handler when the container starts
+# Run the handler on container start
 CMD ["python", "handler.py"]
