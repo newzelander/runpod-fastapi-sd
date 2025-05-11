@@ -5,70 +5,39 @@ import os
 import runpod
 import uuid
 import time
-import base64  # For base64 image preview
+import base64
 
 # Paths
 SNAPSHOT_PATH = "/runpod-volume/models/stable-diffusion-3.5-large/cache/models--stabilityai--stable-diffusion-3.5-large/snapshots/ceddf0a7fdf2064ea28e2213e3b84e4afa170a0f"
-OUTPUT_DIR = "/runpod-volume/outputs"
 BASE_CACHE_PATH = "/runpod-volume/models/stable-diffusion-3.5-large/cache"
+OUTPUT_DIR = "/runpod-volume/outputs"
 
-# Create output directory if not exists
+# Ensure output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Function to scan all files in a directory
-def scan_cache_files(base_path):
-    file_paths = []
-    for root, dirs, files in os.walk(base_path):
-        for file in files:
-            full_path = os.path.join(root, file)
-            file_paths.append(full_path)
-    return file_paths
-
-# Function to get total directory size in MB
-def get_directory_size_mb(path):
-    total_size = 0
+# Utility to calculate total size of a directory
+def get_directory_size(path):
+    total = 0
     for dirpath, _, filenames in os.walk(path):
         for f in filenames:
             fp = os.path.join(dirpath, f)
-            if os.path.isfile(fp):
-                total_size += os.path.getsize(fp)
-    return round(total_size / (1024 * 1024), 2)  # Convert to MB
+            if os.path.exists(fp):
+                total += os.path.getsize(fp)
+    return total
 
-# Scan directories
-print("🔍 Scanning snapshot and cache directories...")
-cached_files = scan_cache_files(BASE_CACHE_PATH)
-snapshot_files = scan_cache_files(SNAPSHOT_PATH)
+def human_readable_size(bytes, decimals=2):
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if bytes < 1024:
+            return f"{bytes:.{decimals}f} {unit}"
+        bytes /= 1024
+    return f"{bytes:.{decimals}f} PB"
 
-print(f"✅ {len(snapshot_files)} files found in SNAPSHOT_PATH")
-print(f"✅ {len(cached_files)} files found in BASE_CACHE_PATH before merging")
+# Log sizes of key directories
+print(f"📁 SNAPSHOT_PATH size: {human_readable_size(get_directory_size(SNAPSHOT_PATH))}")
+print(f"📁 BASE_CACHE_PATH size: {human_readable_size(get_directory_size(BASE_CACHE_PATH))}")
+print(f"📁 OUTPUT_DIR size: {human_readable_size(get_directory_size(OUTPUT_DIR))}")
 
-# Merge snapshot files into cached list
-for file in snapshot_files:
-    if file not in cached_files:
-        cached_files.append(file)
-
-print(f"🗃️ Total unique model files after merge: {len(cached_files)}")
-
-# Show some files (optional)
-print("📂 Snapshot files:")
-for path in snapshot_files[:3]:
-    print(f" - {path}")
-if len(snapshot_files) > 3:
-    print(" - ...")
-
-print("📂 Final cache files used:")
-for path in cached_files[:3]:
-    print(f" - {path}")
-if len(cached_files) > 3:
-    print(" - ...")
-
-# Report sizes of directories
-print("\n📦 Directory Sizes:")
-print(f"📁 SNAPSHOT_PATH size: {get_directory_size_mb(SNAPSHOT_PATH)} MB")
-print(f"📁 BASE_CACHE_PATH size: {get_directory_size_mb(BASE_CACHE_PATH)} MB")
-print(f"📁 OUTPUT_DIR (generated images): {get_directory_size_mb(OUTPUT_DIR)} MB\n")
-
-# Load the model
+# Load the pipeline from local
 print("🚀 Loading Stable Diffusion pipeline from local paths...")
 load_start = time.time()
 
@@ -81,17 +50,17 @@ pipe = StableDiffusion3Pipeline.from_pretrained(
 ).to("cuda")
 
 load_end = time.time()
-print(f"✅ Model loaded successfully in {load_end - load_start:.2f} seconds")
+print(f"✅ Model loaded in {load_end - load_start:.2f} seconds")
 
-# Optional: Enable memory optimizations
+# Memory optimizations
 try:
     pipe.enable_xformers_memory_efficient_attention()
     print("✅ Xformers memory optimization enabled")
 except Exception as e:
-    print(f"⚠️ Xformers not available or failed to enable: {e}")
+    print(f"⚠️ Xformers optimization failed: {e}")
 
 pipe.enable_attention_slicing()
-pipe.safety_checker = None  # Disable safety checker to save VRAM
+pipe.safety_checker = None
 print("🧠 Attention slicing enabled; safety checker disabled")
 
 # Handler function
@@ -100,40 +69,36 @@ def handler(job):
     prompt = input_data.get("prompt")
 
     if not prompt:
-        return {"status": "error", "message": "No prompt provided!"}
+        return {"status": "error", "message": "No prompt provided."}
 
-    print(f"🎨 Received prompt: '{prompt}' — starting generation...")
-
+    print(f"🎨 Generating image for prompt: {prompt}")
     generation_start = time.time()
+
     image: Image.Image = pipe(
         prompt=prompt,
         num_inference_steps=28,
         guidance_scale=3.5
     ).images[0]
-    generation_end = time.time()
 
+    generation_end = time.time()
     print(f"✅ Image generated in {generation_end - generation_start:.2f} seconds")
 
+    # Save and encode image
     file_name = f"{uuid.uuid4().hex}.png"
     image_path = os.path.join(OUTPUT_DIR, file_name)
     image.save(image_path)
-    print(f"🖼️ Image saved to: {image_path}")
 
     with open(image_path, "rb") as img_file:
         image_base64 = base64.b64encode(img_file.read()).decode("utf-8")
-
-    image_base64 = f"data:image/png;base64,{image_base64}"
-
-    public_url = f"https://{job['id']}-output.runpod.io/{file_name}"
+        image_data_url = f"data:image/png;base64,{image_base64}"
 
     return {
         "status": "success",
         "prompt": prompt,
-        "image_path": image_path,
-        "url": public_url,
-        "image_base64": image_base64
+        "image_base64": image_data_url,
+        "html": f'<a download="image.png" href="{image_data_url}">Download Image</a>'
     }
 
-# Start serverless handler
+# Start the serverless handler
 print("🟢 Ready to accept jobs")
 runpod.serverless.start({"handler": handler})
