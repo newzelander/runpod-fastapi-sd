@@ -3,17 +3,25 @@ FROM python:3.9-slim
 # Set working directory
 WORKDIR /app
 
-# Copy the necessary files into the container
+# Install system-level dependencies required by Pillow, OpenVINO, etc.
+RUN apt-get update && apt-get install -y \
+    git \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy your app files into the container
 COPY . /app
 
-# Install dependencies from requirements.txt
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install OpenVINO and related dependencies for optimum
-RUN pip install --no-cache-dir "optimum[openvino]" --upgrade
+# Install OpenVINO for optimum
+RUN pip install --no-cache-dir "optimum[openvino]"
 
-# Install any other libraries for the project (if needed)
-RUN pip install --no-cache-dir torch torchvision
 
-# Run the handler when the container starts
+# Default command to run your app
 CMD ["python", "handler.py"]
