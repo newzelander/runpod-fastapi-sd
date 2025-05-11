@@ -7,7 +7,6 @@ import traceback
 
 from optimum.intel.openvino import OVStableDiffusionPipeline
 from diffusers.utils import load_image
-
 from PIL import Image
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
@@ -20,10 +19,11 @@ MODEL_ID = "AIFunOver/stable-diffusion-3.5-large-turbo-openvino-fp16"
 OUTPUT_DIR = "/runpod-volume/outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Load the pipeline with export=True (first time it converts model to IR)
+# Load the pipeline (without export=True to avoid broken model structure)
+pipe = None
 try:
     print(f"🔄 Loading pipeline from model: {MODEL_ID}")
-    pipe = OVStableDiffusionPipeline.from_pretrained(MODEL_ID, export=True, token=HF_TOKEN)
+    pipe = OVStableDiffusionPipeline.from_pretrained(MODEL_ID, token=HF_TOKEN)
     print("✅ OpenVINO pipeline initialized")
 except Exception as e:
     print(f"❌ Failed to load pipeline: {e}")
@@ -43,6 +43,10 @@ def handler(job):
     if not prompt:
         print("⚠️ No prompt provided in input.")
         return {"status": "error", "message": "No prompt provided."}
+
+    if pipe is None:
+        print("❌ Pipeline is not initialized.")
+        return {"status": "error", "message": "Pipeline is not loaded."}
 
     print(f"🎨 Generating image for prompt: {prompt}")
     generation_start = time.time()
