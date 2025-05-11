@@ -5,16 +5,17 @@ import base64
 import os
 import runpod
 
-# Define the Hugging Face model ID (you can replace this with your model's ID)
-MODEL_ID = "stabilityai/stable-diffusion-3.5-large"  # Example, replace with your model's ID
+# Read Hugging Face token from environment variable
+HF_TOKEN = os.environ.get("HF_TOKEN")  # Make sure this matches your RunPod secret key name
 
-# Hugging Face Inference API client setup
-client = InferenceClient(model=MODEL_ID)
+# Define the Hugging Face model ID
+MODEL_ID = "stabilityai/stable-diffusion-3.5-large"
+
+# Hugging Face Inference API client setup with token
+client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
 
 # Paths
 OUTPUT_DIR = "/runpod-volume/outputs"
-
-# Ensure output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Utility to calculate total size of a directory
@@ -34,7 +35,6 @@ def human_readable_size(bytes, decimals=2):
         bytes /= 1024
     return f"{bytes:.{decimals}f} PB"
 
-# Log size of OUTPUT_DIR
 print(f"📁 OUTPUT_DIR size: {human_readable_size(get_directory_size(OUTPUT_DIR))}")
 
 # Handler function
@@ -48,21 +48,16 @@ def handler(job):
     print(f"🎨 Generating image for prompt: {prompt}")
     generation_start = time.time()
 
-    # Call Hugging Face's inference API to generate the image
-    response = client.text_to_image(prompt=prompt, num_inference_steps=28, guidance_scale=3.5)
+    # Call Hugging Face inference API
+    image = client.text_to_image(prompt=prompt, num_inference_steps=28, guidance_scale=3.5)
 
     generation_end = time.time()
     print(f"✅ Image generated in {generation_end - generation_start:.2f} seconds")
 
-    # Save and encode image
     file_name = f"{uuid.uuid4().hex}.png"
     image_path = os.path.join(OUTPUT_DIR, file_name)
-    image = response['image']  # Assuming Hugging Face returns image in some format
+    image.save(image_path)
 
-    with open(image_path, "wb") as img_file:
-        img_file.write(image)
-
-    # Encode image to base64
     with open(image_path, "rb") as img_file:
         image_base64 = base64.b64encode(img_file.read()).decode("utf-8")
         image_data_url = f"data:image/png;base64,{image_base64}"
@@ -74,6 +69,5 @@ def handler(job):
         "html": f'<a download="image.png" href="{image_data_url}">Download Image</a>'
     }
 
-# Start the serverless handler
 print("🟢 Ready to accept jobs")
 runpod.serverless.start({"handler": handler})
