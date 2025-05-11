@@ -5,7 +5,8 @@ torch
 diffusers
 transformers
 pillow 
-runpod  
+runpod
+optimum[openvino]
 protobuf
 safetensors
 accelerate
