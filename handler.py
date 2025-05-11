@@ -1,4 +1,4 @@
-from huggingface_hub import InferenceClient
+from optimum.intel.openvino import OVPipelineForText2Image
 import uuid
 import time
 import base64
@@ -6,21 +6,17 @@ import os
 import runpod
 import traceback
 
+# Check if the Hugging Face token is set in the environment
 HF_TOKEN = os.environ.get("HF_TOKEN")
 if not HF_TOKEN:
     print("❌ ERROR: HF_TOKEN environment variable is not set.")
 else:
     print("🔑 HF_TOKEN successfully loaded from environment.")
 
-MODEL_ID = "stabilityai/stable-diffusion-3.5-large"
+# Set the Hugging Face model ID
+MODEL_ID = "AIFunOver/stable-diffusion-3.5-large-turbo-openvino-fp16"
 
-try:
-    client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
-    print(f"🧠 Hugging Face client initialized with model: {MODEL_ID}")
-except Exception as e:
-    print(f"❌ Failed to initialize Hugging Face client: {e}")
-    traceback.print_exc()
-
+# Output path
 OUTPUT_DIR = "/runpod-volume/outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -42,6 +38,15 @@ def human_readable_size(bytes, decimals=2):
 
 print(f"📁 OUTPUT_DIR size: {human_readable_size(get_directory_size(OUTPUT_DIR))}")
 
+# Load OpenVINO pipeline
+try:
+    pipe = OVPipelineForText2Image.from_pretrained(MODEL_ID, use_auth_token=HF_TOKEN)
+    print(f"🧠 OpenVINO pipeline loaded with model: {MODEL_ID}")
+except Exception as e:
+    print(f"❌ Failed to load OpenVINO model: {e}")
+    traceback.print_exc()
+
+# Job handler
 def handler(job):
     input_data = job.get("input", {})
     prompt = input_data.get("prompt")
@@ -54,19 +59,13 @@ def handler(job):
     generation_start = time.time()
 
     try:
-        # Optimized parameters
-        image = client.text_to_image(
-            prompt=prompt,
-            num_inference_steps=20,     # ↓ faster
-            guidance_scale=2.5          # ↓ more natural, faster
-        )
+        image = pipe(prompt=prompt).images[0]  # OpenVINO returns a list
         generation_end = time.time()
         print(f"✅ Image generated in {generation_end - generation_start:.2f} seconds")
 
-        # Save as JPEG (smaller size)
         file_name = f"{uuid.uuid4().hex}.jpg"
         image_path = os.path.join(OUTPUT_DIR, file_name)
-        image.save(image_path, format="JPEG", quality=85)  # balance size/quality
+        image.save(image_path, format="JPEG", quality=85)
         print(f"💾 Image saved to: {image_path} ({human_readable_size(os.path.getsize(image_path))})")
 
         with open(image_path, "rb") as img_file:
