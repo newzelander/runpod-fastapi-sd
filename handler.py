@@ -37,7 +37,7 @@ def handler(job):
     try:
         payload = {
             "prompt": prompt,
-            "models": ["stable_cascade"],
+            "models": ["stable-cascade"],
             "params": {
                 "n": 1,
                 "steps": 50,
@@ -114,5 +114,4 @@ def handler(job):
 
 # Start RunPod serverless
 if __name__ == "__main__":
-    import runpod
     runpod.serverless.start({"handler": handler})
