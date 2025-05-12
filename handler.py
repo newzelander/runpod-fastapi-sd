@@ -5,6 +5,7 @@ import uuid
 import requests
 import traceback
 import runpod
+import random
 
 # Configuration
 OUTPUT_DIR = "./output"
@@ -22,6 +23,9 @@ def human_readable_size(size_bytes):
             return f"{size_bytes:.2f} {unit}"
         size_bytes /= 1024.0
     return f"{size_bytes:.2f} TB"
+
+def exponential_backoff(attempt, max_wait=60):
+    return min(max_wait, (2 ** attempt) + random.uniform(0, 1))
 
 def handler(job):
     input_data = job.get("input", {})
@@ -52,43 +56,63 @@ def handler(job):
         headers = {
             'apikey': AI_HORDE_API_KEY,
             'Content-Type': 'application/json',
-            'Client-Agent': 'runpod-stable-cascade-script/1.0 (https://your-portfolio-or-github.com)'  # Optional: personalize
+            'Client-Agent': 'runpod-stable-cascade-script/1.1 (https://your-site.com)'
         }
 
-        # Submit async request
-        response = requests.post(AI_HORDE_API_URL, json=payload, headers=headers)
-        response.raise_for_status()
+        # Submit async request with retry
+        max_submit_retries = 5
+        for attempt in range(max_submit_retries):
+            try:
+                response = requests.post(AI_HORDE_API_URL, json=payload, headers=headers)
+                if response.status_code == 429:
+                    wait = exponential_backoff(attempt)
+                    print(f"🔁 Submit rate limited (429). Retrying in {wait:.1f} seconds...")
+                    time.sleep(wait)
+                    continue
+                response.raise_for_status()
+                break
+            except requests.RequestException as e:
+                print(f"⚠️ Submit error: {e}")
+                if attempt == max_submit_retries - 1:
+                    raise
+                time.sleep(exponential_backoff(attempt))
+        
         request_id = response.json().get("id")
-
         if not request_id:
             raise ValueError("No request ID received from AI Horde.")
 
-        # Poll for completion
+        print(f"📨 Request ID: {request_id}")
         status_url = f"https://aihorde.net/api/v2/generate/status/{request_id}"
-        print("⏳ Waiting for image to be generated...")
 
-        max_retries = 60
-        for attempt in range(max_retries):
-            poll = requests.get(status_url, headers=headers)
+        # Poll for completion
+        max_poll_attempts = 60
+        for attempt in range(max_poll_attempts):
+            try:
+                poll = requests.get(status_url, headers=headers)
+                if poll.status_code == 429:
+                    wait = exponential_backoff(attempt)
+                    print(f"🔁 Poll rate limited (429). Retrying in {wait:.1f} seconds...")
+                    time.sleep(wait)
+                    continue
+                poll.raise_for_status()
+                poll_data = poll.json()
 
-            if poll.status_code == 429:
-                print("🔁 Rate limited (429). Backing off for 10 seconds...")
-                time.sleep(10)
-                continue
+                if poll_data.get("done"):
+                    generations = poll_data.get("generations", [])
+                    if not generations or "img" not in generations[0]:
+                        raise ValueError("No image returned after generation completed.")
+                    image_url = generations[0]["img"]
+                    break
 
-            poll.raise_for_status()
-            poll_data = poll.json()
-
-            if poll_data.get("done"):
-                generations = poll_data.get("generations", [])
-                if not generations or "img" not in generations[0]:
-                    raise ValueError("No image returned after generation completed.")
-                image_url = generations[0]["img"]
-                break
-
-            time.sleep(3)  # More respectful polling
+                print(f"⏳ Waiting... Queue position: {poll_data.get('queue_position')}")
+                time.sleep(5)
+            except requests.RequestException as e:
+                print(f"⚠️ Polling error: {e}")
+                if attempt == max_poll_attempts - 1:
+                    raise
+                time.sleep(exponential_backoff(attempt))
         else:
-            raise TimeoutError("Image generation timed out after max retries.")
+            raise TimeoutError("Image generation timed out after polling.")
 
         # Download the image
         image_response = requests.get(image_url)
@@ -122,6 +146,6 @@ def handler(job):
             "error": str(e)
         }
 
-# Start RunPod serverless
+# RunPod entry point
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})
