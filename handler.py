@@ -1,10 +1,10 @@
-import runpod
 import requests
 import os
 import uuid
 import time
 import base64
 import traceback
+import runpod  # ✅ Required for runpod.serverless
 
 # Load API key from environment variables
 AI_HORDE_API_KEY = os.environ.get("AI_HORDE_API_KEY")
@@ -52,37 +52,37 @@ def handler(job):
         # Prepare the payload for AI Horde
         payload = {
             "prompt": prompt,
-            "models": ["stable_cascade"],  # Ensure the model is available in AI Horde
-            "num_inference_steps": 50,    # Adjust number of steps as needed
-            "guidance_scale": 7.5         # Adjust guidance scale as needed
+            "models": ["stable_cascade"],  # Make sure this model is valid on AI Horde
+            "num_inference_steps": 50,
+            "guidance_scale": 7.5
         }
 
-        # Set up headers for authorization
+        # ✅ Corrected headers to use 'apikey'
         headers = {
-            'Authorization': f'Bearer {AI_HORDE_API_KEY}',
+            'apikey': AI_HORDE_API_KEY,
             'Content-Type': 'application/json'
         }
 
         # Send request to AI Horde API
         response = requests.post(AI_HORDE_API_URL, json=payload, headers=headers)
 
-        # Check if the response is valid
-        response.raise_for_status()  # Raises HTTPError for bad responses
+        # Raise an error for bad responses (e.g., 400, 401)
+        response.raise_for_status()
 
-        # Process the response from AI Horde
+        # Process the response
         image_data = response.json()
         image_url = image_data.get("url")
 
         if not image_url:
             raise ValueError("No image URL received from AI Horde.")
 
-        # Download the generated image from AI Horde
+        # Download the image
         image_response = requests.get(image_url)
         image_response.raise_for_status()
 
-        # Save as JPEG (smaller size)
         file_name = f"{uuid.uuid4().hex}.jpg"
         image_path = os.path.join(OUTPUT_DIR, file_name)
+
         with open(image_path, "wb") as img_file:
             img_file.write(image_response.content)
 
