@@ -51,7 +51,8 @@ def handler(job):
 
         headers = {
             'apikey': AI_HORDE_API_KEY,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Client-Agent': 'runpod-stable-cascade-script/1.0 (https://your-portfolio-or-github.com)'  # Optional: personalize
         }
 
         # Submit async request
@@ -64,10 +65,17 @@ def handler(job):
 
         # Poll for completion
         status_url = f"https://aihorde.net/api/v2/generate/status/{request_id}"
-        print(f"⏳ Waiting for image to be generated...")
+        print("⏳ Waiting for image to be generated...")
 
-        while True:
+        max_retries = 60
+        for attempt in range(max_retries):
             poll = requests.get(status_url, headers=headers)
+
+            if poll.status_code == 429:
+                print("🔁 Rate limited (429). Backing off for 10 seconds...")
+                time.sleep(10)
+                continue
+
             poll.raise_for_status()
             poll_data = poll.json()
 
@@ -78,7 +86,9 @@ def handler(job):
                 image_url = generations[0]["img"]
                 break
 
-            time.sleep(2)  # Delay before next poll
+            time.sleep(3)  # More respectful polling
+        else:
+            raise TimeoutError("Image generation timed out after max retries.")
 
         # Download the image
         image_response = requests.get(image_url)
