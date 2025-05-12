@@ -1,41 +1,29 @@
-import requests
 import os
-import uuid
 import time
 import base64
+import uuid
+import requests
 import traceback
-import runpod  # ✅ Required for runpod.serverless
+from runpod.serverless.modules.rp_logger import RunPodLogger
 
-# Load API key from environment variables
-AI_HORDE_API_KEY = os.environ.get("AI_HORDE_API_KEY")
-if not AI_HORDE_API_KEY:
-    print("❌ ERROR: AI_HORDE_API_KEY environment variable is not set.")
-else:
-    print("🔑 AI_HORDE_API_KEY successfully loaded from environment.")
+logger = RunPodLogger()
 
-# AI Horde API URL for async generation
-AI_HORDE_API_URL = "https://aihorde.net/api/v2/generate/async"
-
-OUTPUT_DIR = "/runpod-volume/outputs"
+# Configuration
+OUTPUT_DIR = "./output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def get_directory_size(path):
-    total = 0
-    for dirpath, _, filenames in os.walk(path):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            if os.path.exists(fp):
-                total += os.path.getsize(fp)
-    return total
+AI_HORDE_API_KEY = os.getenv("AI_HORDE_API_KEY")
+AI_HORDE_API_URL = "https://aihorde.net/api/v2/generate/async"
 
-def human_readable_size(bytes, decimals=2):
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if bytes < 1024:
-            return f"{bytes:.{decimals}f} {unit}"
-        bytes /= 1024
-    return f"{bytes:.{decimals}f} PB"
+if not AI_HORDE_API_KEY:
+    raise EnvironmentError("AI_HORDE_API_KEY not set in environment variables.")
 
-print(f"📁 OUTPUT_DIR size: {human_readable_size(get_directory_size(OUTPUT_DIR))}")
+def human_readable_size(size_bytes):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} TB"
 
 def handler(job):
     input_data = job.get("input", {})
@@ -49,32 +37,50 @@ def handler(job):
     generation_start = time.time()
 
     try:
-        # Prepare the payload for AI Horde
         payload = {
             "prompt": prompt,
-            "models": ["stable_cascade"],  # Make sure this model is valid on AI Horde
-            "num_inference_steps": 50,
-            "guidance_scale": 7.5
+            "models": ["stable_cascade"],
+            "params": {
+                "n": 1,
+                "steps": 50,
+                "width": 512,
+                "height": 512,
+                "karras": True,
+                "sampler_name": "k_euler",
+                "cfg_scale": 7
+            }
         }
 
-        # ✅ Corrected headers to use 'apikey'
         headers = {
             'apikey': AI_HORDE_API_KEY,
             'Content-Type': 'application/json'
         }
 
-        # Send request to AI Horde API
+        # Submit async request
         response = requests.post(AI_HORDE_API_URL, json=payload, headers=headers)
-
-        # Raise an error for bad responses (e.g., 400, 401)
         response.raise_for_status()
+        request_id = response.json().get("id")
 
-        # Process the response
-        image_data = response.json()
-        image_url = image_data.get("url")
+        if not request_id:
+            raise ValueError("No request ID received from AI Horde.")
 
-        if not image_url:
-            raise ValueError("No image URL received from AI Horde.")
+        # Poll for completion
+        status_url = f"https://aihorde.net/api/v2/generate/status/{request_id}"
+        print(f"⏳ Waiting for image to be generated...")
+
+        while True:
+            poll = requests.get(status_url, headers=headers)
+            poll.raise_for_status()
+            poll_data = poll.json()
+
+            if poll_data.get("done"):
+                generations = poll_data.get("generations", [])
+                if not generations or "img" not in generations[0]:
+                    raise ValueError("No image returned after generation completed.")
+                image_url = generations[0]["img"]
+                break
+
+            time.sleep(2)  # Delay before next poll
 
         # Download the image
         image_response = requests.get(image_url)
@@ -83,13 +89,13 @@ def handler(job):
         file_name = f"{uuid.uuid4().hex}.jpg"
         image_path = os.path.join(OUTPUT_DIR, file_name)
 
-        with open(image_path, "wb") as img_file:
-            img_file.write(image_response.content)
+        with open(image_path, "wb") as f:
+            f.write(image_response.content)
 
         print(f"💾 Image saved to: {image_path} ({human_readable_size(os.path.getsize(image_path))})")
 
-        with open(image_path, "rb") as img_file:
-            image_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+        with open(image_path, "rb") as f:
+            image_base64 = base64.b64encode(f.read()).decode("utf-8")
             image_data_url = f"data:image/jpeg;base64,{image_base64}"
 
         return {
@@ -99,25 +105,16 @@ def handler(job):
             "html": f'<a download="image.jpg" href="{image_data_url}">Download Image</a>'
         }
 
-    except requests.exceptions.HTTPError as e:
-        error_response = e.response.json()
-        print(f"❌ ERROR: {e}")
-        print(f"Error Response: {error_response}")
-        traceback.print_exc()
-        return {
-            "status": "error",
-            "message": str(e),
-            "error_details": error_response
-        }
-
     except Exception as e:
         print(f"❌ ERROR during image generation or processing: {e}")
         traceback.print_exc()
         return {
             "status": "error",
-            "message": "Image generation failed. See server logs for details.",
+            "message": "Image generation failed.",
             "error": str(e)
         }
 
-print("🟢 Ready to accept jobs from RunPod...")
-runpod.serverless.start({"handler": handler})
+# Start RunPod serverless
+if __name__ == "__main__":
+    import runpod
+    runpod.serverless.start({"handler": handler})
