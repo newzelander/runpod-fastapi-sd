@@ -4,9 +4,7 @@ import base64
 import uuid
 import requests
 import traceback
-from runpod.serverless.modules.rp_logger import RunPodLogger
-
-logger = RunPodLogger()
+import runpod
 
 # Configuration
 OUTPUT_DIR = "./output"
