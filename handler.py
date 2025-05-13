@@ -13,12 +13,11 @@ CF_API_KEY = os.environ.get("CF_API_KEY")
 CF_ACCOUNT_ID = "48e7ad58d6c738dfa0e4d609249df2a3"  # Your provided Account ID
 
 def handler(job):
-    # Access the 'input' field from the job request (if exists)
+    # Access the 'input' field from the job request
     input_data = job.get("input", {})
 
-    # Fallback if 'input' is missing
-    prompt = input_data.get("prompt") or job.get("prompt")
-    negative_prompt = input_data.get("negative_prompt") or job.get("negative_prompt")
+    prompt = input_data.get("prompt", "").strip()
+    negative_prompt = input_data.get("negative_prompt", "").strip()
 
     if not prompt:
         return {"status": "error", "message": "No prompt provided."}
@@ -26,7 +25,7 @@ def handler(job):
     if not CF_API_KEY or not CF_ACCOUNT_ID:
         return {"status": "error", "message": "Missing Cloudflare API credentials in environment variables."}
 
-    # ✅ Proper payload structure for Cloudflare Workers AI
+    # ✅ Proper payload structure for Cloudflare Workers AI (correct root-level prompt)
     payload = {
         "prompt": prompt,
         "negative_prompt": negative_prompt
