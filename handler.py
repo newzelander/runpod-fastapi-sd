@@ -22,21 +22,21 @@ def handler(job):
     if not CF_API_KEY or not CF_ACCOUNT_ID:
         return {"status": "error", "message": "Missing Cloudflare API credentials in environment variables."}
 
-    # Build input for Cloudflare model
+    # Build the payload for Cloudflare's AI API
     input_payload = {
         "prompt": prompt,
         "negative_prompt": negative_prompt,
-        "width": 1024,                # hardcoded
-        "height": 1024,               # hardcoded
-        "num_inference_steps": 35,    # hardcoded
-        "guidance_scale": 7.5         # hardcoded
+        "width": 1024,                # hardcoded value for image width
+        "height": 1024,               # hardcoded value for image height
+        "num_inference_steps": 35,    # hardcoded inference steps
+        "guidance_scale": 7.5         # hardcoded guidance scale
     }
 
     payload = {
         "input": input_payload
     }
 
-    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/meta/stable-diffusion-xl-base-1.0"
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
 
     headers = {
         "Authorization": f"Bearer {CF_API_KEY}",
