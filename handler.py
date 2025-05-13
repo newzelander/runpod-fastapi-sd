@@ -24,11 +24,10 @@ def handler(job):
     if not CF_API_KEY or not CF_ACCOUNT_ID:
         return {"status": "error", "message": "Missing Cloudflare API credentials."}
 
+    # ✅ FIXED payload format
     payload = {
-        "input": {
-            "prompt": prompt,
-            "negative_prompt": negative_prompt
-        }
+        "prompt": prompt,
+        "negative_prompt": negative_prompt
     }
 
     url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
@@ -42,7 +41,7 @@ def handler(job):
         response = requests.post(url, headers=headers, json=payload)
 
         print("🔍 Response status code:", response.status_code)
-        print("🔍 Response text:", response.text[:500])  # avoid printing full base64 blob
+        print("🔍 Response text:", response.text[:500])
 
         response.raise_for_status()
 
