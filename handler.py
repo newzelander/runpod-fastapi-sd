@@ -4,18 +4,17 @@ import base64
 import requests
 import runpod
 import traceback
+from requests.exceptions import JSONDecodeError
 
 OUTPUT_DIR = "/runpod-volume/outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Your Cloudflare credentials
 CF_API_KEY = os.environ.get("CF_API_KEY")
-CF_ACCOUNT_ID = "48e7ad58d6c738dfa0e4d609249df2a3"  # Your provided Account ID
+CF_ACCOUNT_ID = "48e7ad58d6c738dfa0e4d609249df2a3"
 
 def handler(job):
-    # Access the 'input' field from the job request
     input_data = job.get("input", {})
-
     prompt = input_data.get("prompt", "").strip()
     negative_prompt = input_data.get("negative_prompt", "").strip()
 
@@ -23,9 +22,8 @@ def handler(job):
         return {"status": "error", "message": "No prompt provided."}
 
     if not CF_API_KEY or not CF_ACCOUNT_ID:
-        return {"status": "error", "message": "Missing Cloudflare API credentials in environment variables."}
+        return {"status": "error", "message": "Missing Cloudflare API credentials."}
 
-    # ✅ Proper payload structure for Cloudflare Workers AI
     payload = {
         "input": {
             "prompt": prompt,
@@ -34,7 +32,6 @@ def handler(job):
     }
 
     url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
-
     headers = {
         "Authorization": f"Bearer {CF_API_KEY}",
         "Content-Type": "application/json"
@@ -44,12 +41,15 @@ def handler(job):
         print(f"🎨 Sending request to Cloudflare Workers AI: {url}")
         response = requests.post(url, headers=headers, json=payload)
 
-        # ✅ Print raw response for debugging
         print("🔍 Response status code:", response.status_code)
-        print("🔍 Response text:", response.text)
+        print("🔍 Response text:", response.text[:500])  # avoid printing full base64 blob
 
         response.raise_for_status()
-        result = response.json()
+
+        try:
+            result = response.json()
+        except JSONDecodeError:
+            return {"status": "error", "message": "Failed to parse JSON from Cloudflare response."}
 
         if "result" not in result or "image" not in result["result"]:
             return {"status": "error", "message": "Image not returned by Cloudflare API."}
