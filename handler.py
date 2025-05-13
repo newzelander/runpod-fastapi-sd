@@ -4,15 +4,15 @@ import requests
 import runpod
 import traceback
 import json
-import base64  # Add this for base64 encoding
+import base64  # For base64 encoding
 
 # Directory where output images will be saved
 OUTPUT_DIR = "/runpod-volume/outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Cloudflare credentials
-CF_API_KEY = os.environ.get("CF_API_KEY")
-CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID") or "48e7ad58d6c738dfa0e4d609249df2a3"
+# Load credentials from environment variables
+CF_API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN")
+CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID")
 
 def handler(job):
     input_data = job.get("input", {})
@@ -23,9 +23,10 @@ def handler(job):
     if not prompt:
         return {"status": "error", "message": "No prompt provided."}
 
-    if not CF_API_KEY or not CF_ACCOUNT_ID:
+    if not CF_API_TOKEN or not CF_ACCOUNT_ID:
         return {"status": "error", "message": "Missing Cloudflare API credentials."}
 
+    # Payload for Cloudflare AI
     payload = {
         "prompt": prompt,
         "negative_prompt": negative_prompt
@@ -34,7 +35,7 @@ def handler(job):
     url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
 
     headers = {
-        "Authorization": f"Bearer {CF_API_KEY}",
+        "Authorization": f"Bearer {CF_API_TOKEN}",
         "Content-Type": "application/json"
     }
 
@@ -43,38 +44,37 @@ def handler(job):
         response = requests.post(url, headers=headers, json=payload)
 
         print("🔍 Status code:", response.status_code)
-        print("🔍 Response text:", response.text[:500])  # Limit to 500 chars for safety
+        print("🔍 Response text:", response.text[:500])  # Only for debugging
 
-        # Handle any HTTP error response (e.g., 400 or 500)
+        # Check if the request failed
         response.raise_for_status()
 
-        # Check if the response content is what we expect (e.g., an image)
-        content_type = response.headers.get("Content-Type")
+        # Ensure response contains image data
+        content_type = response.headers.get("Content-Type", "")
         if "image" not in content_type:
-            return {"status": "error", "message": f"Expected image, but got {content_type}"}
+            return {"status": "error", "message": f"Expected image, but got: {content_type}"}
 
-        # The image is returned as a binary response, not JSON
-        image_data = response.content  # Binary data of the image
-
+        image_data = response.content
         if not image_data:
             return {"status": "error", "message": "No image returned from Cloudflare AI."}
 
-        file_name = f"{uuid.uuid4().hex}.png"  # Save as PNG since it seems to be a PNG image
+        # Save image
+        file_name = f"{uuid.uuid4().hex}.png"
         image_path = os.path.join(OUTPUT_DIR, file_name)
-
         with open(image_path, "wb") as f:
             f.write(image_data)
 
-        # Return a download link for the image
-        image_data_url = f"data:image/png;base64,{base64.b64encode(image_data).decode('utf-8')}"
+        # Create base64 version
+        image_base64 = base64.b64encode(image_data).decode("utf-8")
+        data_url = f"data:image/png;base64,{image_base64}"
 
         return {
             "status": "success",
             "prompt": prompt,
             "negative_prompt": negative_prompt,
             "image_path": image_path,
-            "image_base64": image_data_url,
-            "html": f'<a download="image.png" href="{image_data_url}">Download Image</a>'
+            "image_base64": data_url,
+            "html": f'<a download="image.png" href="{data_url}">Download Image</a>'
         }
 
     except requests.exceptions.HTTPError as http_err:
