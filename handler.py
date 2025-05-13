@@ -1,12 +1,15 @@
-import requests
+import os
 import uuid
 import base64
-import os
+import requests
 import runpod
 import traceback
 
 OUTPUT_DIR = "/runpod-volume/outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+CF_API_KEY = os.environ.get("CF_API_KEY")
+CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID")  # You must also store your Cloudflare account ID as a secret
 
 def handler(job):
     input_data = job.get("input", {})
@@ -14,36 +17,48 @@ def handler(job):
     negative_prompt = input_data.get("negative_prompt", "").strip()
 
     if not prompt:
-        print("⚠️ No prompt provided in input.")
         return {"status": "error", "message": "No prompt provided."}
 
-    # Use the flux model from Pollinations
-    base_url = "https://image.pollinations.ai/prompt/"
-    prompt_encoded = requests.utils.quote(prompt)
-    url = f"{base_url}{prompt_encoded}?model=flux"
+    if not CF_API_KEY or not CF_ACCOUNT_ID:
+        return {"status": "error", "message": "Missing Cloudflare API credentials in environment variables."}
 
+    # Cloudflare Workers AI endpoint
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/meta/stable-diffusion-xl-base-1.0"
+
+    headers = {
+        "Authorization": f"Bearer {CF_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "prompt": prompt
+    }
+
+    # Add negative prompt if present
     if negative_prompt:
-        neg_encoded = requests.utils.quote(negative_prompt)
-        url += f"&negPrompt={neg_encoded}"
-
-    print(f"🎨 Generating image from Pollinations API...\nURL: {url}")
+        payload["negative_prompt"] = negative_prompt
 
     try:
-        response = requests.get(url)
+        print(f"🎨 Sending request to Cloudflare Workers AI: {url}")
+        response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
+        result = response.json()
 
-        # Save image
+        # Check for image content
+        if "result" not in result or "image" not in result["result"]:
+            return {"status": "error", "message": "Image not returned by Cloudflare API."}
+
+        # Decode and save image
+        image_base64 = result["result"]["image"]
+        image_data = base64.b64decode(image_base64)
         file_name = f"{uuid.uuid4().hex}.jpg"
         image_path = os.path.join(OUTPUT_DIR, file_name)
 
         with open(image_path, "wb") as f:
-            f.write(response.content)
+            f.write(image_data)
 
-        with open(image_path, "rb") as img_file:
-            image_base64 = base64.b64encode(img_file.read()).decode("utf-8")
-            image_data_url = f"data:image/jpeg;base64,{image_base64}"
+        image_data_url = f"data:image/jpeg;base64,{image_base64}"
 
-        print(f"✅ Image saved to {image_path}")
         return {
             "status": "success",
             "prompt": prompt,
@@ -53,13 +68,8 @@ def handler(job):
         }
 
     except Exception as e:
-        print(f"❌ ERROR during image generation or download: {e}")
         traceback.print_exc()
-        return {
-            "status": "error",
-            "message": "Image generation failed. See server logs for details.",
-            "error": str(e)
-        }
+        return {"status": "error", "message": str(e)}
 
-print("🟢 Ready to accept jobs from RunPod...")
+print("🟢 Ready to accept jobs from RunPod using Cloudflare Workers AI...")
 runpod.serverless.start({"handler": handler})
