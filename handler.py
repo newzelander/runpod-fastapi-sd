@@ -5,16 +5,22 @@ import requests
 import runpod
 import traceback
 
+# Output directory for saving generated images
 OUTPUT_DIR = "/runpod-volume/outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# Get Cloudflare credentials from environment variables
 CF_API_KEY = os.environ.get("CF_API_KEY")
-CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID")  # You must also store your Cloudflare account ID as a secret
+CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID")  # Store this in RunPod Secrets
 
 def handler(job):
     input_data = job.get("input", {})
     prompt = input_data.get("prompt", "").strip()
     negative_prompt = input_data.get("negative_prompt", "").strip()
+    steps = input_data.get("num_inference_steps", 30)
+    guidance = input_data.get("guidance_scale", 7.5)
+    width = input_data.get("width", 1024)
+    height = input_data.get("height", 1024)
 
     if not prompt:
         return {"status": "error", "message": "No prompt provided."}
@@ -30,13 +36,21 @@ def handler(job):
         "Content-Type": "application/json"
     }
 
-    payload = {
-        "prompt": prompt
+    # Proper payload format for Workers AI
+    input_payload = {
+        "prompt": prompt,
+        "num_inference_steps": steps,
+        "guidance_scale": guidance,
+        "width": width,
+        "height": height
     }
 
-    # Add negative prompt if present
     if negative_prompt:
-        payload["negative_prompt"] = negative_prompt
+        input_payload["negative_prompt"] = negative_prompt
+
+    payload = {
+        "input": input_payload
+    }
 
     try:
         print(f"🎨 Sending request to Cloudflare Workers AI: {url}")
@@ -44,7 +58,7 @@ def handler(job):
         response.raise_for_status()
         result = response.json()
 
-        # Check for image content
+        # Check for image in result
         if "result" not in result or "image" not in result["result"]:
             return {"status": "error", "message": "Image not returned by Cloudflare API."}
 
@@ -64,6 +78,7 @@ def handler(job):
             "prompt": prompt,
             "negative_prompt": negative_prompt,
             "image_base64": image_data_url,
+            "image_path": image_path,
             "html": f'<a download="image.jpg" href="{image_data_url}">Download Image</a>'
         }
 
