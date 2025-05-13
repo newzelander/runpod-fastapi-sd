@@ -25,11 +25,7 @@ def handler(job):
     # Build the payload for Cloudflare's AI API
     input_payload = {
         "prompt": prompt,
-        "negative_prompt": negative_prompt,
-        "width": 1024,                # hardcoded value for image width
-        "height": 1024,               # hardcoded value for image height
-        "num_inference_steps": 35,    # hardcoded inference steps
-        "guidance_scale": 7.5         # hardcoded guidance scale
+        "negative_prompt": negative_prompt
     }
 
     payload = {
