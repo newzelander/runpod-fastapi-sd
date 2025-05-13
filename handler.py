@@ -12,8 +12,8 @@ CF_API_KEY = os.environ.get("CF_API_KEY")
 CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID")
 
 def handler(job):
-    # Expecting flat JSON input like: {"prompt": "...", "negative_prompt": "..."}
-    input_data = job
+    # Access the 'input' field from the job request
+    input_data = job.get("input", {})
 
     prompt = input_data.get("prompt", "").strip()
     negative_prompt = input_data.get("negative_prompt", "").strip()
@@ -24,7 +24,7 @@ def handler(job):
     if not CF_API_KEY or not CF_ACCOUNT_ID:
         return {"status": "error", "message": "Missing Cloudflare API credentials in environment variables."}
 
-    # Prepare payload directly without 'input' nesting
+    # Prepare payload for Cloudflare's AI API
     payload = {
         "prompt": prompt,
         "negative_prompt": negative_prompt
@@ -64,10 +64,6 @@ def handler(job):
             "html": f'<a download="image.jpg" href="{image_data_url}">Download Image</a>'
         }
 
-    except requests.exceptions.HTTPError as http_err:
-        print(f"HTTP error occurred: {http_err}")
-        print(f"Response content: {response.content}")
-        return {"status": "error", "message": str(http_err)}
     except Exception as e:
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
