@@ -1,10 +1,10 @@
 import os
 import uuid
-import base64
 import requests
 import runpod
 import traceback
 import json
+import base64  # Add this for base64 encoding
 
 # Directory where output images will be saved
 OUTPUT_DIR = "/runpod-volume/outputs"
@@ -43,26 +43,30 @@ def handler(job):
         response = requests.post(url, headers=headers, json=payload)
 
         print("🔍 Status code:", response.status_code)
-        print("🔍 Response text:", response.text)
+        print("🔍 Response text:", response.text[:500])  # Limit to 500 chars for safety
 
+        # Handle any HTTP error response (e.g., 400 or 500)
         response.raise_for_status()
-        result = response.json()
 
-        # Cloudflare wraps the AI output inside 'result' -> 'image'
-        image_base64 = result.get("result", {}).get("image")
+        # Check if the response content is what we expect (e.g., an image)
+        content_type = response.headers.get("Content-Type")
+        if "image" not in content_type:
+            return {"status": "error", "message": f"Expected image, but got {content_type}"}
 
-        if not image_base64:
+        # The image is returned as a binary response, not JSON
+        image_data = response.content  # Binary data of the image
+
+        if not image_data:
             return {"status": "error", "message": "No image returned from Cloudflare AI."}
 
-        # Decode and save image
-        image_data = base64.b64decode(image_base64)
-        file_name = f"{uuid.uuid4().hex}.jpg"
+        file_name = f"{uuid.uuid4().hex}.png"  # Save as PNG since it seems to be a PNG image
         image_path = os.path.join(OUTPUT_DIR, file_name)
 
         with open(image_path, "wb") as f:
             f.write(image_data)
 
-        image_data_url = f"data:image/jpeg;base64,{image_base64}"
+        # Return a download link for the image
+        image_data_url = f"data:image/png;base64,{base64.b64encode(image_data).decode('utf-8')}"
 
         return {
             "status": "success",
@@ -70,9 +74,12 @@ def handler(job):
             "negative_prompt": negative_prompt,
             "image_path": image_path,
             "image_base64": image_data_url,
-            "html": f'<a download="image.jpg" href="{image_data_url}">Download Image</a>'
+            "html": f'<a download="image.png" href="{image_data_url}">Download Image</a>'
         }
 
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err}")
+        return {"status": "error", "message": f"HTTP error: {http_err}"}
     except Exception as e:
         print("❌ Exception occurred:")
         traceback.print_exc()
