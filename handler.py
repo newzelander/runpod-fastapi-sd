@@ -8,8 +8,9 @@ import traceback
 OUTPUT_DIR = "/runpod-volume/outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# Your Cloudflare credentials
 CF_API_KEY = os.environ.get("CF_API_KEY")
-CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID")
+CF_ACCOUNT_ID = "48e7ad58d6c738dfa0e4d609249df2a3"  # Your provided Account ID
 
 def handler(job):
     # Access the 'input' field from the job request
@@ -24,10 +25,12 @@ def handler(job):
     if not CF_API_KEY or not CF_ACCOUNT_ID:
         return {"status": "error", "message": "Missing Cloudflare API credentials in environment variables."}
 
-    # Prepare payload for Cloudflare's AI API
+    # ✅ Proper payload structure for Cloudflare Workers AI
     payload = {
-        "prompt": prompt,
-        "negative_prompt": negative_prompt
+        "input": {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt
+        }
     }
 
     url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
@@ -40,6 +43,11 @@ def handler(job):
     try:
         print(f"🎨 Sending request to Cloudflare Workers AI: {url}")
         response = requests.post(url, headers=headers, json=payload)
+
+        # ✅ Print raw response for debugging
+        print("🔍 Response status code:", response.status_code)
+        print("🔍 Response text:", response.text)
+
         response.raise_for_status()
         result = response.json()
 
