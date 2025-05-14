@@ -26,14 +26,15 @@ def handler(job):
     if not CF_API_TOKEN or not CF_ACCOUNT_ID:
         return {"status": "error", "message": "Missing Cloudflare API credentials."}
 
-    # Payload for Cloudflare AI (using Flux model)
+    # Payload for Cloudflare AI, including num_inference_steps and guidance_scale
     payload = {
         "prompt": prompt,
-        "negative_prompt": negative_prompt
+        "negative_prompt": negative_prompt,
+        "num_inference_steps": 20,  # Set number of inference steps
+        "guidance_scale": 2.5       # Set guidance scale
     }
 
-    # URL for the Flux model (latest model from Cloudflare)
-    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/flux/image-generation"
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
 
     headers = {
         "Authorization": f"Bearer {CF_API_TOKEN}",
