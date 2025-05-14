@@ -32,7 +32,8 @@ def handler(job):
         "negative_prompt": negative_prompt
     }
 
-    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
+    # URL for Cloudflare AI Gateway (adjusted to the new structure)
+    url = f"https://gateway.ai.cloudflare.com/v1/{CF_ACCOUNT_ID}/f-a-s-t-e-r-g-e-n/@cf/stabilityai/stable-diffusion-xl-base-1.0"
 
     headers = {
         "Authorization": f"Bearer {CF_API_TOKEN}",
@@ -40,7 +41,7 @@ def handler(job):
     }
 
     try:
-        print(f"🎨 Sending request to Cloudflare: {url}")
+        print(f"🎨 Sending request to Cloudflare AI Gateway: {url}")
         response = requests.post(url, headers=headers, json=payload)
 
         print("🔍 Status code:", response.status_code)
