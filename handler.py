@@ -26,16 +26,13 @@ def handler(job):
     if not CF_API_TOKEN or not CF_ACCOUNT_ID:
         return {"status": "error", "message": "Missing Cloudflare API credentials."}
 
-    # Payload for Cloudflare AI, including num_inference_steps and guidance_scale
+    # Payload for Cloudflare AI
     payload = {
         "prompt": prompt,
-        "negative_prompt": negative_prompt,
-        "num_inference_steps": 20,  # Set number of inference steps
-        "guidance_scale": 2.5       # Set guidance scale
+        "negative_prompt": negative_prompt
     }
 
-    # Update the URL to use AI Gateway structure
-    url = f"https://gateway.ai.cloudflare.com/v1/{CF_ACCOUNT_ID}/f-a-s-t-e-r-g-e-n/@cf/stabilityai/stable-diffusion-xl-base-1.0"
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
 
     headers = {
         "Authorization": f"Bearer {CF_API_TOKEN}",
