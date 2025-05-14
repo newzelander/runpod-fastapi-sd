@@ -1,90 +1,65 @@
-import os
-import uuid
 import requests
+import uuid
+import base64
+import os
 import runpod
 import traceback
-import json
-import base64  # For base64 encoding
 
-# Directory where output images will be saved
 OUTPUT_DIR = "/runpod-volume/outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Load credentials from environment variables
-CF_API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN")
-CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID")
-
 def handler(job):
     input_data = job.get("input", {})
-
     prompt = input_data.get("prompt", "").strip()
     negative_prompt = input_data.get("negative_prompt", "").strip()
 
     if not prompt:
+        print("⚠️ No prompt provided in input.")
         return {"status": "error", "message": "No prompt provided."}
 
-    if not CF_API_TOKEN or not CF_ACCOUNT_ID:
-        return {"status": "error", "message": "Missing Cloudflare API credentials."}
+    # Use the flux model from Pollinations with watermark disabled
+    base_url = "https://image.pollinations.ai/prompt/"
+    prompt_encoded = requests.utils.quote(prompt)
+    url = f"{base_url}{prompt_encoded}?model=flux&nologo=true"
 
-    # Payload for Cloudflare AI
-    payload = {
-        "prompt": prompt,
-        "negative_prompt": negative_prompt
-    }
+    if negative_prompt:
+        neg_encoded = requests.utils.quote(negative_prompt)
+        url += f"&negPrompt={neg_encoded}"
 
-    # URL for Cloudflare AI Gateway (adjusted to the new structure)
-    url = f"https://gateway.ai.cloudflare.com/v1/{CF_ACCOUNT_ID}/f-a-s-t-e-r-g-e-n/@cf/stabilityai/stable-diffusion-xl-base-1.0"
-
-    headers = {
-        "Authorization": f"Bearer {CF_API_TOKEN}",
-        "Content-Type": "application/json"
-    }
+    print(f"🎨 Generating image from Pollinations API...\nURL: {url}")
 
     try:
-        print(f"🎨 Sending request to Cloudflare AI Gateway: {url}")
-        response = requests.post(url, headers=headers, json=payload)
-
-        print("🔍 Status code:", response.status_code)
-        print("🔍 Response text:", response.text[:500])  # Only for debugging
-
-        # Check if the request failed
+        response = requests.get(url)
         response.raise_for_status()
 
-        # Ensure response contains image data
-        content_type = response.headers.get("Content-Type", "")
-        if "image" not in content_type:
-            return {"status": "error", "message": f"Expected image, but got: {content_type}"}
-
-        image_data = response.content
-        if not image_data:
-            return {"status": "error", "message": "No image returned from Cloudflare AI."}
-
         # Save image
-        file_name = f"{uuid.uuid4().hex}.png"
+        file_name = f"{uuid.uuid4().hex}.jpg"
         image_path = os.path.join(OUTPUT_DIR, file_name)
+
         with open(image_path, "wb") as f:
-            f.write(image_data)
+            f.write(response.content)
 
-        # Create base64 version
-        image_base64 = base64.b64encode(image_data).decode("utf-8")
-        data_url = f"data:image/png;base64,{image_base64}"
+        with open(image_path, "rb") as img_file:
+            image_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+            image_data_url = f"data:image/jpeg;base64,{image_base64}"
 
+        print(f"✅ Image saved to {image_path}")
         return {
             "status": "success",
             "prompt": prompt,
             "negative_prompt": negative_prompt,
-            "image_path": image_path,
-            "image_base64": data_url,
-            "html": f'<a download="image.png" href="{data_url}">Download Image</a>'
+            "image_base64": image_data_url,
+            "html": f'<a download="image.jpg" href="{image_data_url}">Download Image</a>'
         }
 
-    except requests.exceptions.HTTPError as http_err:
-        print(f"HTTP error occurred: {http_err}")
-        return {"status": "error", "message": f"HTTP error: {http_err}"}
     except Exception as e:
-        print("❌ Exception occurred:")
+        print(f"❌ ERROR during image generation or download: {e}")
         traceback.print_exc()
-        return {"status": "error", "message": str(e)}
+        return {
+            "status": "error",
+            "message": "Image generation failed. See server logs for details.",
+            "error": str(e)
+        }
 
-print("🟢 Worker is ready to receive jobs via RunPod...")
+print("🟢 Ready to accept jobs from RunPod...")
 runpod.serverless.start({"handler": handler})
