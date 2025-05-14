@@ -34,7 +34,7 @@ def handler(job):
         "guidance_scale": 2.5       # Set guidance scale
     }
 
-    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/f-a-s-t-e-r-g-e-n/workers-ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
 
     headers = {
         "Authorization": f"Bearer {CF_API_TOKEN}",
