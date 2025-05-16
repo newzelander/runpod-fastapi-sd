@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+requests
 huggingface_hub
 torch
 diffusers
