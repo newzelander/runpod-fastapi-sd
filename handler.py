@@ -1,16 +1,25 @@
+from fastapi import FastAPI, Request 
+from fastapi.middleware.cors import CORSMiddleware
 import requests
-import uuid
-import base64
-import runpod
-import traceback
 
-def handler(job):
-    input_data = job.get("input", {})
-    prompt = input_data.get("prompt", "").strip()
-    negative_prompt = input_data.get("negative_prompt", "").strip()
+app = FastAPI()
+
+# ✅ Correct CORS setup — must include protocol (https://)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://spaceluma.webflow.io"],  # ✅ must include full URL
+    allow_credentials=True,
+    allow_methods=["*"],  # ✅ allow all standard methods like POST, GET, etc.
+    allow_headers=["*"],  # ✅ allow all standard headers
+)
+
+@app.post("/generate")
+async def generate_image(request: Request):
+    data = await request.json()
+    prompt = data.get("prompt", "").strip()
+    negative_prompt = data.get("negative_prompt", "").strip()
 
     if not prompt:
-        print("⚠️ No prompt provided in input.")
         return {"status": "error", "message": "No prompt provided."}
 
     base_url = "https://image.pollinations.ai/prompt/"
@@ -21,32 +30,16 @@ def handler(job):
         neg_encoded = requests.utils.quote(negative_prompt)
         url += f"&negPrompt={neg_encoded}"
 
-    print(f"🎨 Generating image from Pollinations API...\nURL: {url}")
-
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-
-        image_base64 = base64.b64encode(response.content).decode("utf-8")
-        image_data_url = f"data:image/jpeg;base64,{image_base64}"
-
-        print("✅ Image fetched and encoded in memory.")
+        # ✅ Return the direct image URL (no base64)
         return {
             "status": "success",
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "image_base64": image_data_url,
-            "html": f'<a download="image.jpg" href="{image_data_url}">Download Image</a>'
+            "image_url": url
         }
 
     except Exception as e:
-        print(f"❌ ERROR during image generation or download: {e}")
-        traceback.print_exc()
         return {
             "status": "error",
-            "message": "Image generation failed. See server logs for details.",
+            "message": "Image generation failed.",
             "error": str(e)
         }
-
-print("🟢 Ready to accept jobs from RunPod...")
-runpod.serverless.start({"handler": handler})
