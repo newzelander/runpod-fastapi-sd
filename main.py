@@ -1,3 +1,18 @@
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+import requests
+
+app = FastAPI()
+
+# ✅ CORS setup: allow requests from your Webflow site
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://spaceluma.webflow.io"],  # Update this if your domain changes
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.post("/generate")
 async def generate_image(request: Request):
     data = await request.json()
